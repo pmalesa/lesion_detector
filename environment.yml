@@ -1,0 +1,32 @@
+name: lesion_detector_env
+channels: 
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.12.0
+
+  # Core packages
+  - numpy=1.26.4
+  - matplotlib=3.9.3
+
+  # Deep learning framework
+  - tensorflow=2.17.0
+
+  # Addtitional packages
+  - pyyaml=6.0.2
+
+  # GPU support
+  - cudatoolkit=11.8.0
+  - cudnn=9.3.0.75
+
+  # Include pip for pip-only packages 
+  - pip
+
+  # pip packages
+  - pip:
+    - pre-commit==4.0.1
+    - black==24.10.0
+    - flake8==7.1.1
+    - isort==5.13.2
+    - mypy==1.13.0
+    - pytest==8.3.4
