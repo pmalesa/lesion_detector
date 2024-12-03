@@ -11,7 +11,7 @@ conda init
 conda env create -f environment.yml
 
 # Activate the environment
-conda activate lesion_detector
+conda activate lesion_detector_env
 
 # Reload the environment
 conda env update --name lesion_detector_env --file environment.yml --prune
