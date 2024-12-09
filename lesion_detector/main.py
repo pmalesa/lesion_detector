@@ -1,17 +1,23 @@
 import argparse
-import sys
 import logging
+import sys
 from pathlib import Path
 
+
 def main():
-    parser = argparse.ArgumentParser(description = "Lesion Detector Entry Point")
+    parser = argparse.ArgumentParser(description="Lesion Detector Entry Point")
 
     parser.add_argument(
         "--task",
-        type = str,
-        required = True,
-        choices = ["train_localizer", "test_localizer", "train_classifier", "test_classifier"],
-        help = "Specify which task to run/"
+        type=str,
+        required=True,
+        choices=[
+            "train_localizer",
+            "test_localizer",
+            "train_classifier",
+            "test_classifier",
+        ],
+        help="Specify which task to run/",
     )
 
     args = parser.parse_args()
@@ -36,8 +42,8 @@ def main():
     logger.setLevel(logging.INFO)
 
     formatter = logging.Formatter(
-        fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt = "%Y-%m-%d %H:%M:%S"
+        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     ch = logging.StreamHandler()
@@ -59,6 +65,7 @@ def main():
         sys.exit(1)
 
     logger.info("Task completed successfully.")
+
 
 if __name__ == "__main__":
     main()

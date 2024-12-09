@@ -1,23 +1,24 @@
-# Code formatter (PEP 8 standard)
-- repo: https://github.com/psf/black
-  rev: 24.10.0
-  hooks:
-    -id: black
+repos:
+  # Code formatter (PEP 8 standard)
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
 
-# Linter
-- repo: https://gitlab.com/pycqa/flake8
-  rev: 7.1.1
-  hooks:
-    - id: flake8
+  # Linter
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.1
+    hooks:
+      - id: flake8
 
-# Import sorting
-- repo: https://github.com/PyCQA/isort
-  rev: 5.13.2
-  hooks:
-    - id: isort
+  # Import sorting
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
 
-# Static type checking
-- repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.13.0
-  hooks:
-    - id: mypy
+  # Static type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
