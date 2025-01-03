@@ -3,10 +3,12 @@ import logging
 import sys
 from pathlib import Path
 
+from common.file_utils import load_config
+from localizer.trainer import test_localizer, train_localizer
+
 
 def main():
     parser = argparse.ArgumentParser(description="Lesion Detector Entry Point")
-
     parser.add_argument(
         "--task",
         type=str,
@@ -19,7 +21,6 @@ def main():
         ],
         help="Specify which task to run/",
     )
-
     args = parser.parse_args()
 
     # Load configuration
@@ -34,28 +35,26 @@ def main():
         print(f"Config file not found: {config_path}")
         sys.exit(1)
 
-    # TODO - implement common method to load config
-    # config = load_config(config_path)
+    config = load_config(config_path)
 
     # Set up logging
     logger = logging.getLogger("LESION-DETECTOR")
     logger.setLevel(logging.INFO)
-
     formatter = logging.Formatter(
         fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-
     ch = logging.StreamHandler()
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
     logger.info(f"Starting the task: {args.task}")
-
     if args.task == "train_localizer":
-        pass
+        print("Environment config:", config["environment"])
+        print("Agent config:", config["agent"])
+        train_localizer(config)
     elif args.task == "test_localizer":
-        pass
+        test_localizer(config)
     elif args.task == "train_classifier":
         pass
     elif args.task == "test_classifier":

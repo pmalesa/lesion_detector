@@ -1,0 +1,30 @@
+environment:
+  dataset_path: /
+  metadata_file: /data/deeplesion_metadata.csv
+
+  # Max steps the agent can take before the episode ends
+  max_steps: 100
+
+agent:
+  learning_rate: 0.0001
+  gamma: 0.99 # discount factor
+  epsilon_start: 1.0
+  epsilon_end: 0.1
+  epsilon_decay: 10000
+  replay_buffer_size: 100000
+  batch_size: 64
+
+train:
+  train_episodes: 1000
+  log_interval: 10                 # print/log progress every X episodes
+  save_interval: 50                # chackpoint model every X episodes
+  output_dir: runs/localizer/logs  # path for saving logs, checkpoints etc.
+
+test:
+  test_episodes: 20
+  model_checkpoint: runs/localizer/checkpoints/agent_lastest.pt
+
+logging:
+  level: INFO
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+  datefmt: "%Y-%m-%d %H:%M:%S"

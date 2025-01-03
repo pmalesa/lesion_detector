@@ -26,6 +26,11 @@ conda deactivate
 conda remove --name lesion_detector_env --all
 ```
 
+## Run training
+```bash
+python main.py --task train_localizer
+```
+
 ## Pre-commit Hooks Configuration
 ### Install Pre-commit Hooks
 ```bash
