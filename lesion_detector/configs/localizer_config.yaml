@@ -1,6 +1,6 @@
 environment:
-  dataset_path: /
-  metadata_file: /data/deeplesion_metadata.csv
+  dataset_path: ""
+  metadata_file: "../data/deeplesion_metadata.csv"
 
   # Max steps the agent can take before the episode ends
   max_steps: 100
@@ -16,13 +16,13 @@ agent:
 
 train:
   train_episodes: 1000
-  log_interval: 10                 # print/log progress every X episodes
-  save_interval: 50                # chackpoint model every X episodes
-  output_dir: runs/localizer/logs  # path for saving logs, checkpoints etc.
+  log_interval: 10                      # print/log progress every X episodes
+  save_interval: 50                     # chackpoint model every X episodes
+  output_dir: "../runs/localizer/logs"  # path for saving logs, checkpoints etc.
 
 test:
   test_episodes: 20
-  model_checkpoint: runs/localizer/checkpoints/agent_lastest.pt
+  model_checkpoint: "../runs/localizer/checkpoints/agent_lastest.pt"
 
 logging:
   level: INFO

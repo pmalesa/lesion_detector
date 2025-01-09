@@ -1,22 +1,30 @@
+from typing import Any
+
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+from numpy.typing import NDArray
 from PIL import Image
 
 
-def load_image(path):
+def load_metadata(path: str) -> pd.DataFrame:
+    return pd.read_csv(path)
+
+
+def load_image(path: str):
     img = Image.open(path)
     img_array = np.array(img)
     return img_array
 
 
-def save_image(img_array, path):
+def save_image(img_array: NDArray[Any], path: str):
     if img_array.dtype != np.uint16:
         img_array = img_array.astype(np.uint16)
     img = Image.fromarray(img_array)
     img.save(path)
 
 
-def show_image(img, title="None", cmap="gray"):
+def show_image(img: NDArray[np.float32], title="None", cmap="gray"):
     plt.figure(figsize=(5, 5))
     plt.imshow(img, cmap=cmap)
     if title is not None:
@@ -25,12 +33,7 @@ def show_image(img, title="None", cmap="gray"):
     plt.show()
 
 
-def convert_to_hu(img):
-    hu_img = img - 32768
-    return hu_img
-
-
-def normalize(img):
+def normalize(img: NDArray[np.uint16]):
     img = img.astype(np.float32)
     max = np.max(img)
     min = np.min(img)

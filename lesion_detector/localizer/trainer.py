@@ -16,6 +16,7 @@ def train_localizer(config):
     num_episodes = config.get("train_episodes", 100)
     for episode in range(num_episodes):
         obs = env.reset()
+        break  # TODO
         done = True
         # done = False
         episode_reward = 0.0
@@ -29,6 +30,12 @@ def train_localizer(config):
         logger.info(f"Episode {episode} - Reward: {episode_reward}")
 
     logger.info("Localizer training finished.")
+
+    # -----
+
+    env.test()
+
+    # -----
 
 
 def test_localizer(config):
