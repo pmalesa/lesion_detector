@@ -8,6 +8,7 @@ from localizer.trainer import test_localizer, train_localizer
 
 
 def main():
+    # Parse command line parameters
     parser = argparse.ArgumentParser(description="Lesion Detector Entry Point")
     parser.add_argument(
         "--task",
@@ -29,29 +30,26 @@ def main():
         config_path = "configs/localizer_config.yaml"
     else:
         config_path = "configs/classifier_config.yaml"
-
     config_path = Path(config_path)
     if not config_path.exists():
         print(f"Config file not found: {config_path}")
         sys.exit(1)
-
     config = load_config(config_path)
 
     # Set up logging
     logger = logging.getLogger("LESION-DETECTOR")
     logger.setLevel(logging.INFO)
     formatter = logging.Formatter(
-        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
+        fmt=config["logging"]["format"],
+        datefmt=config["logging"]["datefmt"],
     )
     ch = logging.StreamHandler()
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
+    # Run given task
     logger.info(f"Starting the task: {args.task}")
     if args.task == "train_localizer":
-        print("Environment config:", config["environment"])
-        print("Agent config:", config["agent"])
         train_localizer(config)
     elif args.task == "test_localizer":
         test_localizer(config)

@@ -11,14 +11,14 @@ class ReplayBuffer:
         (obs, action, reward, next_obs, done) tuples.
         """
 
-        self.__buffer = deque(maxlen=capacity)
+        self._buffer = deque(maxlen=capacity)
 
     def store(self, experience):
         """
         Store single experience tuple (obs, action, reward, next_obs, done).
         """
 
-        self.__buffer.append(experience)
+        self._buffer.append(experience)
 
     def sample(self, batch_size):
         """
@@ -26,7 +26,7 @@ class ReplayBuffer:
         Returns a list of tuples (obs, action, reward, next_obs, done).
         """
 
-        batch = random.sample(self.__buffer, batch_size)
+        batch = random.sample(self._buffer, batch_size)
         observations, actions, rewards, next_observations, dones = zip(*batch)
         return (
             np.array(observations),
@@ -37,4 +37,4 @@ class ReplayBuffer:
         )
 
     def __len__(self):
-        return len(self.__buffer)
+        return len(self._buffer)

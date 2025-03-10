@@ -15,7 +15,9 @@ def train_localizer(config):
 
     num_episodes = config.get("train_episodes", 100)
     for episode in range(num_episodes):
-        obs = env.reset()
+        obs = env.reset(
+            "../data/000001_03_01_088.png"
+        )  # TODO - change so that it iterates over some/all training images
         break  # TODO
         done = True
         # done = False
