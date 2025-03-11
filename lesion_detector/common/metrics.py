@@ -48,3 +48,28 @@ def iou(bbox_A: np.ndarray, bbox_B: np.ndarray) -> float:
         return 0.0
 
     return inter_area / union_area
+
+
+def dist(bbox_A: np.ndarray, bbox_B: np.ndarray) -> float:
+    """
+    Method that computes the distance between the centers of
+    two given bounding boxes.
+    """
+
+    # Extract parameters of both bounding boxes
+    Ax, Ay, Aw, Ah = bbox_A
+    Bx, By, Bw, Bh = bbox_B
+
+    # Compute the coordinates of the bounding boxes' centers
+    Ax_center = Ax + Aw / 2.0
+    Ay_center = Ay + Ah / 2.0
+
+    Bx_center = Bx + Bw / 2.0
+    By_center = By + Bh / 2.0
+
+    # Compute the distance between the bounding boxes' centers
+    dist_x = Bx_center - Ax_center
+    dist_y = By_center - Ay_center
+    dist = np.sqrt(dist_x**2 + dist_y**2)
+
+    return dist

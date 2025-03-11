@@ -1,7 +1,7 @@
 import numpy as np
 from common.file_utils import extract_filename
 from common.image_utils import load_image, load_metadata, show_image
-from common.metrics import iou
+from common.metrics import dist, iou
 from numpy.typing import NDArray
 
 
@@ -29,8 +29,11 @@ class LocalizerEnv:
 
         self._image_data = None
         self._image_name = None
-        self._img_height = None
-        self._img_width = None
+        self._image_height = None
+        self._image_width = None
+
+        # Maximal distance between two points in the image
+        self._max_dist = None
 
         # Bounding boxes are np.arrays of the form [x, y, width, height]
         self._current_bbox = None
@@ -71,13 +74,38 @@ class LocalizerEnv:
         return next_obs, reward, done, info
 
     def _get_observation(self) -> dict[str, NDArray[np.float32]]:
-        return {"image_data": self._image_data, "bbox": self._current_bbox}
+        # Normalize current bounding box' coordinates and sizes
+        x_norm = self._current_bbox[0] / self._image_width
+        y_norm = self._current_bbox[1] / self._image_height
+        w_norm = self._current_bbox[2] / self._image_width
+        h_norm = self._current_bbox[3] / self._image_height
 
-    # TODO
+        return {
+            "image_data": self._image_data,
+            "bbox": np.array([x_norm, y_norm, w_norm, h_norm]),
+        }
+
     def _compute_reward(self) -> float:
-        # ...
+        """
+        Computes the reward, that includes three components:
+        * Component proportional to the IoU metric,
+        * Component inversely proportional to the distance between centers,
+        * Step penalty component.
+        """
+        alpha = 5.0
+        beta = 2.0
+        step_penalty = -0.01
 
-        return 1.0
+        iou_val = iou(self._current_bbox, self._target_bbox)
+
+        # Compute and normalize distance between centers
+        dist_val = dist(self._current_bbox, self._target_bbox)
+        dist_val_norm = dist_val / self._max_dist
+        center_reward = 1 - dist_val_norm
+
+        reward = alpha * iou_val + beta * center_reward + step_penalty
+
+        return reward
 
     def _init_image_data(self, image_path: str):
         """
@@ -86,8 +114,9 @@ class LocalizerEnv:
 
         self._image_data = load_image(image_path)  # TODO - Add normalization
         self._image_name = extract_filename(image_path)
-        self._img_height = self._image_data.shape[0]
-        self._img_width = self._image_data.shape[1]
+        self._image_height = self._image_data.shape[0]
+        self._image_width = self._image_data.shape[1]
+        self._max_dist = np.sqrt(self._image_width**2 + self._image_height**2)
 
     def _reset_bbox(self):
         """
@@ -96,8 +125,8 @@ class LocalizerEnv:
 
         w = self._initial_bbox_width
         h = self._initial_bbox_height
-        x = (self._img_width - w) / 2
-        y = (self._img_height - h) / 2
+        x = (self._image_width - w) / 2
+        y = (self._image_height - h) / 2
         self._current_bbox = np.array([x, y, w, h], dtype=np.float32)
 
     def _calculate_target_bbox(self):
@@ -128,5 +157,6 @@ class LocalizerEnv:
         print(self._target_bbox)
         print(self._current_bbox)
         print(f"IoU: {iou(self._current_bbox, self._target_bbox)}")
+        # self.render()
 
     # -----------------------------------------------------------------
