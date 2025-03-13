@@ -70,6 +70,5 @@ def dist(bbox_A: np.ndarray, bbox_B: np.ndarray) -> float:
     # Compute the distance between the bounding boxes' centers
     dist_x = Bx_center - Ax_center
     dist_y = By_center - Ay_center
-    dist = np.sqrt(dist_x**2 + dist_y**2)
 
-    return dist
+    return np.sqrt(dist_x**2 + dist_y**2)

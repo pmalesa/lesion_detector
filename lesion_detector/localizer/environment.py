@@ -11,10 +11,11 @@ class LocalizerEnv:
         1: "MOVE_DOWN",
         2: "MOVE_LEFT",
         3: "MOVE_RIGHT",
-        4: "RESIZE_LARGER",  # TODO
-        5: "RESIZE_SMALLER",  # TODO
-        6: "MARK",
-        7: "FINISH",
+        4: "INCREASE_WIDTH",
+        5: "DECREASE_WIDTH",
+        6: "INCREASE_HEIGHT",
+        7: "DECREASE_HEIGHT",
+        8: "FINISH",
     }
 
     def __init__(self, config):
@@ -23,9 +24,19 @@ class LocalizerEnv:
         self._dataset_path = self._config.get("dataset_path", "")
         self._metadata = load_metadata(self._metadata_path)
 
+        self._max_steps = self._config["max_steps"]
         self._initial_bbox_width = self._config["initial_bbox_width"]
         self._initial_bbox_height = self._config["initial_bbox_height"]
-        self._bbox_move_step = self._config["bbox_move_step"]
+        self._move_step = self._config["bbox_move_step"]
+        self._resize_factor = self._config["bbox_resize_factor"]
+
+        self._iou_threshold = self._config["iou_threshold"]
+        self._iou_final_reward = self._config["iou_final_reward"]
+
+        # Reward function weights
+        self._alpha = self._config["reward"]["alpha"]
+        self._beta = self._config["reward"]["beta"]
+        self._step_penalty = self._config["reward"]["step_penalty"]
 
         self._image_data = None
         self._image_name = None
@@ -35,50 +46,98 @@ class LocalizerEnv:
         # Maximal distance between two points in the image
         self._max_dist = None
 
+        self._current_step = None
+
         # Bounding boxes are np.arrays of the form [x, y, width, height]
-        self._current_bbox = None
+        self._bbox = None
         self._target_bbox = None
 
     def reset(self, image_path: str):
         self._init_image_data(image_path)
         self._reset_bbox()
         self._calculate_target_bbox()
+        self._current_step = 1
         return self._get_observation()
 
     def step(self, action_id):
+        """
+        Performs a step, given a specific action ID.
+        """
         action = self.ACTIONS[action_id]
 
-        if action == "MOVE_UP":
-            self._bbox_y = max(0, self._bbox_y - self._bbox_move_step)
-        elif action == "MOVE_DOWN":
-            pass
-        elif action == "MOVE_LEFT":
-            pass
-        elif action == "MOVE_RIGHT":
-            pass
-        elif action == "RESIZE_LARGER":
-            pass
-        elif action == "RESIZE_SMALLER":
-            pass
-        elif action == "MARK":
-            pass
-        elif action == "FINISH":
-            done = True
-            return self._get_observation(), self._compute_reward(), done, {}
+        match action:
+            case "MOVE_UP":
+                self._bbox[1] = max(0, self._bbox[1] - self._move_step)
+            case "MOVE_DOWN":
+                self._bbox[1] = min(
+                    self._image_height - 1, self._bbox[1] + self._move_step
+                )
+            case "MOVE_LEFT":
+                self._bbox[0] = max(0, self._bbox[0] - self._move_step)
+            case "MOVE_RIGHT":
+                self._bbox[0] = min(
+                    self._image_width - 1, self._bbox[0] + self._move_step
+                )
+            case "INCREASE_WIDTH":
+                bbox_resize_step = float(
+                    max(1, round(self._bbox[2] * self._resize_factor))
+                )
+                self._bbox[2] = min(
+                    self._bbox[2] + bbox_resize_step,
+                    self._image_width - self._bbox[0],
+                )
+            case "DECREASE_WIDTH":
+                bbox_resize_step = float(
+                    max(1, round(self._bbox[2] * self._resize_factor))
+                )
+                self._bbox[2] = max(self._bbox[2] - bbox_resize_step, 1.0)
+            case "INCREASE_HEIGHT":
+                bbox_resize_step = float(
+                    max(1, round(self._bbox[3] * self._resize_factor))
+                )
+                self._bbox[3] = min(
+                    self._bbox[3] + bbox_resize_step,
+                    self._image_height - self._bbox[1],
+                )
+            case "DECREASE_HEIGHT":
+                bbox_resize_step = float(
+                    max(1, round(self._bbox[3] * self._resize_factor))
+                )
+                self._bbox[3] = max(self._bbox[3] - bbox_resize_step, 1.0)
+            case "FINISH":
+                done = True
+                iou_val = iou(self._bbox, self._target_bbox)
+
+                iou_additional_reward = 0.0
+                if iou_val >= self._iou_threshold:
+                    iou_additional_reward += self._iou_final_reward
+
+                # Maybe add additional big reward for distance
+                # ...
+
+                info = {"bbox": self._bbox}
+
+                return (
+                    self._get_observation(),
+                    self._compute_reward() + iou_additional_reward,
+                    done,
+                    info,
+                )
 
         next_obs = self._get_observation()
         reward = self._compute_reward()
         done = self._check_done()
-        info = {}  # TODO - Maybe store there info about marked bounding boxes
+        info = {} if not done else {"bbox": self._bbox}
+        self._current_step += 1
 
         return next_obs, reward, done, info
 
     def _get_observation(self) -> dict[str, NDArray[np.float32]]:
         # Normalize current bounding box' coordinates and sizes
-        x_norm = self._current_bbox[0] / self._image_width
-        y_norm = self._current_bbox[1] / self._image_height
-        w_norm = self._current_bbox[2] / self._image_width
-        h_norm = self._current_bbox[3] / self._image_height
+        x_norm = self._bbox[0] / self._image_width
+        y_norm = self._bbox[1] / self._image_height
+        w_norm = self._bbox[2] / self._image_width
+        h_norm = self._bbox[3] / self._image_height
 
         return {
             "image_data": self._image_data,
@@ -92,20 +151,17 @@ class LocalizerEnv:
         * Component inversely proportional to the distance between centers,
         * Step penalty component.
         """
-        alpha = 5.0
-        beta = 2.0
-        step_penalty = -0.01
 
-        iou_val = iou(self._current_bbox, self._target_bbox)
+        iou_val = iou(self._bbox, self._target_bbox)
 
         # Compute and normalize distance between centers
-        dist_val = dist(self._current_bbox, self._target_bbox)
+        dist_val = dist(self._bbox, self._target_bbox)
         dist_val_norm = dist_val / self._max_dist
-        center_reward = 1 - dist_val_norm
 
-        reward = alpha * iou_val + beta * center_reward + step_penalty
+        iou_reward = self._alpha * iou_val
+        center_reward = self._beta * (1.0 - dist_val_norm)
 
-        return reward
+        return iou_reward + center_reward + self._step_penalty
 
     def _init_image_data(self, image_path: str):
         """
@@ -113,6 +169,7 @@ class LocalizerEnv:
         """
 
         self._image_data = load_image(image_path)  # TODO - Add normalization
+        # self._image_data = normalize(self._image_data)
         self._image_name = extract_filename(image_path)
         self._image_height = self._image_data.shape[0]
         self._image_width = self._image_data.shape[1]
@@ -127,7 +184,7 @@ class LocalizerEnv:
         h = self._initial_bbox_height
         x = (self._image_width - w) / 2
         y = (self._image_height - h) / 2
-        self._current_bbox = np.array([x, y, w, h], dtype=np.float32)
+        self._bbox = np.array([x, y, w, h], dtype=np.float32)
 
     def _calculate_target_bbox(self):
         """
@@ -142,21 +199,62 @@ class LocalizerEnv:
         w, h = x2 - x1, y2 - y1
         self._target_bbox = np.array([x1, y1, w, h], dtype=np.float32)
 
-    # TODO
     def _check_done(self) -> bool:
-        return False
+        """
+        Checks whether the episode should end.
+        """
+
+        return self._current_step >= self._max_steps
 
     # TODO
     def render(self):
         show_image(self._image_data)
 
     # -----------------------------------------------------------------
-    # TODO - TO REMOVE
+    # TODO - TO REMOVE (ONLY FOR DEBUGGING PURPOSES)
+    # -----------------------------------------------------------------
     def test(self):
         print(self._image_name)
         print(self._target_bbox)
-        print(self._current_bbox)
-        print(f"IoU: {iou(self._current_bbox, self._target_bbox)}")
+        print(self._bbox)
+        # self.draw_bbox(self._bbox, self._target_bbox, self._image_data)
         # self.render()
+
+    # def draw_bbox(self, bbox: np.ndarray,
+    #   target_bbox: np.ndarray,
+    #   image: np.ndarray):
+    #     x1 = bbox[0]
+    #     y1 = bbox[1]
+    #     x2 = bbox[0] + bbox[2] - 1  # right edge
+    #     y2 = bbox[1] + bbox[3] - 1  # bottom edge
+
+    #     height, width = image.shape
+    #     x1 = int(max(0, min(x1, width - 1)))
+    #     x2 = int(max(0, min(x2, width - 1)))
+    #     y1 = int(max(0, min(y1, height - 1)))
+    #     y2 = int(max(0, min(y2, height - 1)))
+
+    #     image[y1, x1 : x2 + 1] = 65535
+    #     image[y2, x1 : x2 + 1] = 65535
+    #     image[y1 : y2 + 1, x1] = 65535
+    #     image[y1 : y2 + 1, x2] = 65535
+
+    #     x1 = target_bbox[0]
+    #     y1 = target_bbox[1]
+    #     x2 = target_bbox[0] + target_bbox[2] - 1  # right edge
+    #     y2 = target_bbox[1] + target_bbox[3] - 1  # bottom edge
+
+    #     height, width = image.shape
+    #     x1 = int(max(0, min(x1, width - 1)))
+    #     x2 = int(max(0, min(x2, width - 1)))
+    #     y1 = int(max(0, min(y1, height - 1)))
+    #     y2 = int(max(0, min(y2, height - 1)))
+
+    #     image[y1, x1 : x2 + 1] = 45535
+    #     image[y2, x1 : x2 + 1] = 45535
+    #     image[y1 : y2 + 1, x1] = 45535
+    #     image[y1 : y2 + 1, x2] = 45535
+
+    #     show_image(image)
 
     # -----------------------------------------------------------------
