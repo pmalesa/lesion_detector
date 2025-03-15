@@ -1,6 +1,7 @@
+import cv2
 import numpy as np
-from common.file_utils import extract_filename
-from common.image_utils import load_image, load_metadata, show_image
+import pandas as pd
+from common.image_utils import load_image
 from common.metrics import dist, iou
 from numpy.typing import NDArray
 
@@ -18,11 +19,10 @@ class LocalizerEnv:
         8: "FINISH",
     }
 
-    def __init__(self, config):
+    def __init__(self, config, render=False):
         self._config = config["environment"]
-        self._metadata_path = self._config.get("metadata_file", "")
-        self._dataset_path = self._config.get("dataset_path", "")
-        self._metadata = load_metadata(self._metadata_path)
+        self._render = render
+        self._image_metadata = None
 
         self._max_steps = self._config["max_steps"]
         self._initial_bbox_width = self._config["initial_bbox_width"]
@@ -52,11 +52,21 @@ class LocalizerEnv:
         self._bbox = None
         self._target_bbox = None
 
-    def reset(self, image_path: str):
-        self._init_image_data(image_path)
+    def reset(self, image_path: str, image_metadata: pd.DataFrame):
+        """
+        Resets the environment and returns the image pixel data
+        and the coordinates of the target bounding box
+        """
+
+        self._init_image_data(image_path, image_metadata)
+        self._init_target_bbox()
         self._reset_bbox()
-        self._calculate_target_bbox()
         self._current_step = 1
+
+        if self._render:
+            cv2.namedWindow("Rendered Image", cv2.WINDOW_NORMAL)
+            cv2.resizeWindow("Rendered Image", 600, 600)
+
         return self._get_observation()
 
     def step(self, action_id):
@@ -113,9 +123,13 @@ class LocalizerEnv:
                     iou_additional_reward += self._iou_final_reward
 
                 # Maybe add additional big reward for distance
+                # Or a negative reward for IoU below threshold
                 # ...
 
                 info = {"bbox": self._bbox}
+
+                # if self._render:
+                #     cv2.destroyAllWindows()
 
                 return (
                     self._get_observation(),
@@ -130,19 +144,39 @@ class LocalizerEnv:
         info = {} if not done else {"bbox": self._bbox}
         self._current_step += 1
 
+        if self._render:
+            self._render_bboxes()
+
         return next_obs, reward, done, info
 
-    def _get_observation(self) -> dict[str, NDArray[np.float32]]:
-        # Normalize current bounding box' coordinates and sizes
-        x_norm = self._bbox[0] / self._image_width
-        y_norm = self._bbox[1] / self._image_height
-        w_norm = self._bbox[2] / self._image_width
-        h_norm = self._bbox[3] / self._image_height
+    def _render_bboxes(self):
+        """
+        Renders the image with both current and target bounding boxes.
+        """
 
-        return {
-            "image_data": self._image_data,
-            "bbox": np.array([x_norm, y_norm, w_norm, h_norm]),
-        }
+        # Rescale the image to 8-bit precision
+        gray_8bit = np.clip(self._image_data * 255, 0, 255).astype(np.uint8)
+
+        # Convert 1-channel 8-bit image to a 3-channel color image
+        rgb = cv2.cvtColor(gray_8bit, cv2.COLOR_GRAY2BGR)
+
+        # Extract bounding box coordinates and draw boxes
+        x, y, w, h = self._target_bbox
+        cv2.rectangle(rgb, (x, y), (x + w, y + h), (0, 0, 255), thickness=1)
+
+        x, y, w, h = self._bbox
+        cv2.rectangle(rgb, (x, y), (x + w, y + h), (0, 255, 0), thickness=1)
+
+        cv2.imshow("Rendered Image", rgb)
+        cv2.waitKey(10)
+
+    def _get_observation(self) -> tuple[NDArray[np.float32], str]:
+        """
+        Returns the observation as a tuple containing
+        normalized current bounding box data and image filename.
+        """
+
+        return (self._normalize_bbox(self._bbox), self._image_name)
 
     def _compute_reward(self) -> float:
         """
@@ -163,14 +197,14 @@ class LocalizerEnv:
 
         return iou_reward + center_reward + self._step_penalty
 
-    def _init_image_data(self, image_path: str):
+    def _init_image_data(self, image_path: str, image_metadata: pd.DataFrame):
         """
         Initializes the image data (pixel data, name and dimensions)
         """
 
-        self._image_data = load_image(image_path)  # TODO - Add normalization
-        # self._image_data = normalize(self._image_data)
-        self._image_name = extract_filename(image_path)
+        self._image_metadata = image_metadata
+        self._image_data = load_image(image_path, norm=True)
+        self._image_name = self._image_metadata["File_name"]
         self._image_height = self._image_data.shape[0]
         self._image_width = self._image_data.shape[1]
         self._max_dist = np.sqrt(self._image_width**2 + self._image_height**2)
@@ -182,22 +216,9 @@ class LocalizerEnv:
 
         w = self._initial_bbox_width
         h = self._initial_bbox_height
-        x = (self._image_width - w) / 2
-        y = (self._image_height - h) / 2
-        self._bbox = np.array([x, y, w, h], dtype=np.float32)
-
-    def _calculate_target_bbox(self):
-        """
-        Calculates ground truth bounding box' parameters.
-        """
-
-        target_bbox_str = self._metadata.loc[
-            self._metadata["File_name"] == self._image_name, "Bounding_boxes"
-        ].iloc[0]
-        target_bbox_coords = [float(val) for val in target_bbox_str.split(",")]
-        x1, y1, x2, y2 = [int(c) for c in target_bbox_coords]
-        w, h = x2 - x1, y2 - y1
-        self._target_bbox = np.array([x1, y1, w, h], dtype=np.float32)
+        x = int((self._image_width - w) / 2)
+        y = int((self._image_height - h) / 2)
+        self._bbox = np.array([x, y, w, h])
 
     def _check_done(self) -> bool:
         """
@@ -206,55 +227,25 @@ class LocalizerEnv:
 
         return self._current_step >= self._max_steps
 
-    # TODO
-    def render(self):
-        show_image(self._image_data)
+    def _init_target_bbox(self):
+        """
+        Calculates ground truth bounding box' parameters.
+        """
 
-    # -----------------------------------------------------------------
-    # TODO - TO REMOVE (ONLY FOR DEBUGGING PURPOSES)
-    # -----------------------------------------------------------------
-    def test(self):
-        print(self._image_name)
-        print(self._target_bbox)
-        print(self._bbox)
-        # self.draw_bbox(self._bbox, self._target_bbox, self._image_data)
-        # self.render()
+        target_bbox_str = self._image_metadata["Bounding_boxes"]
+        target_bbox_coords = [float(val) for val in target_bbox_str.split(",")]
+        x1, y1, x2, y2 = [int(c) for c in target_bbox_coords]
+        w, h = x2 - x1, y2 - y1
+        self._target_bbox = np.array([x1, y1, w, h])
 
-    # def draw_bbox(self, bbox: np.ndarray,
-    #   target_bbox: np.ndarray,
-    #   image: np.ndarray):
-    #     x1 = bbox[0]
-    #     y1 = bbox[1]
-    #     x2 = bbox[0] + bbox[2] - 1  # right edge
-    #     y2 = bbox[1] + bbox[3] - 1  # bottom edge
+    def _normalize_bbox(self, bbox: np.ndarray) -> NDArray[np.float32]:
+        """
+        Normalizes the bounding box' coordinates and sizes.
+        """
 
-    #     height, width = image.shape
-    #     x1 = int(max(0, min(x1, width - 1)))
-    #     x2 = int(max(0, min(x2, width - 1)))
-    #     y1 = int(max(0, min(y1, height - 1)))
-    #     y2 = int(max(0, min(y2, height - 1)))
+        x_norm = bbox[0] / self._image_width
+        y_norm = bbox[1] / self._image_height
+        w_norm = bbox[2] / self._image_width
+        h_norm = bbox[3] / self._image_height
 
-    #     image[y1, x1 : x2 + 1] = 65535
-    #     image[y2, x1 : x2 + 1] = 65535
-    #     image[y1 : y2 + 1, x1] = 65535
-    #     image[y1 : y2 + 1, x2] = 65535
-
-    #     x1 = target_bbox[0]
-    #     y1 = target_bbox[1]
-    #     x2 = target_bbox[0] + target_bbox[2] - 1  # right edge
-    #     y2 = target_bbox[1] + target_bbox[3] - 1  # bottom edge
-
-    #     height, width = image.shape
-    #     x1 = int(max(0, min(x1, width - 1)))
-    #     x2 = int(max(0, min(x2, width - 1)))
-    #     y1 = int(max(0, min(y1, height - 1)))
-    #     y2 = int(max(0, min(y2, height - 1)))
-
-    #     image[y1, x1 : x2 + 1] = 45535
-    #     image[y2, x1 : x2 + 1] = 45535
-    #     image[y1 : y2 + 1, x1] = 45535
-    #     image[y1 : y2 + 1, x2] = 45535
-
-    #     show_image(image)
-
-    # -----------------------------------------------------------------
+        return np.array([x_norm, y_norm, w_norm, h_norm], dtype=np.float32)

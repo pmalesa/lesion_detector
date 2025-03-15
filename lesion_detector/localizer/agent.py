@@ -21,27 +21,31 @@ class LocalizerAgent:
         self._global_step = 0
         self._epsilon = self._epsilon_start
 
+    # TODO
     def select_action(self, state):
 
         # Epsilon-greedy policy
-        if np.random.rand() < self.epsilon:
-            action = np.random.choice([0, 1, 2, 3, 4, 5, 6, 7])
+        if np.random.rand() < self._epsilon:
+            action = np.random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8])
         else:
             # TODO
             # Use Q-network to pick best action
-            action = np.random.choice([0, 1, 2, 3, 4, 5, 6, 7])
+            action = np.random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8])
 
         return action
 
     def store_experience(self, experience):
         self._replay_buffer.store(experience)
 
+    # TODO
     def update(self):
         """
         Updates policy networks using transitions from replay buffer
         """
 
-        if len(self.replay_buffer) < self._batch_size:
+        return
+
+        if len(self._replay_buffer) < self._batch_size:
             return
 
         observations, actions, rewards, next_obesrvations, dones = (

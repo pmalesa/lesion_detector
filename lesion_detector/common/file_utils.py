@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pandas as pd
 import yaml
 
 
@@ -12,3 +13,7 @@ def load_config(config_path: str):
 def extract_filename(path: str):
     full_path = Path(path)
     return full_path.name
+
+
+def load_metadata(path: str) -> pd.DataFrame:
+    return pd.read_csv(path)

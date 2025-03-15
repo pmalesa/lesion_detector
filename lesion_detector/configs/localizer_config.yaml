@@ -1,7 +1,7 @@
-environment:
-  dataset_path: ""
-  metadata_file: "../data/deeplesion_metadata.csv"
+dataset_path: ""
+metadata_path: "../data/deeplesion_metadata.csv"
 
+environment:
   max_steps: 100 # Max steps the agent can take before the episode ends
   bbox_move_step: 5
   bbox_resize_factor: 0.05
@@ -17,7 +17,7 @@ environment:
   reward:
     alpha: 5.0  # Weight of the IoU reward component
     beta: 2.0   # Weight of the center distance reward component 
-    step_penalty: -0.01
+    step_penalty: -0.1
 
 agent:
   learning_rate: 0.0001

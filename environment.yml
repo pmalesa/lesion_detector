@@ -16,6 +16,7 @@ dependencies:
   # Addtitional packages
   - pyyaml=6.0.2
   - types-PyYAML=6.0.12
+  - opencv=4.10.0
 
   # GPU support
   - cudatoolkit=11.8.0

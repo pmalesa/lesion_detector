@@ -1,5 +1,6 @@
 import logging
 
+from common.file_utils import extract_filename, load_metadata
 from localizer.agent import LocalizerAgent
 from localizer.environment import LocalizerEnv
 
@@ -9,19 +10,27 @@ def train_localizer(config):
     logger = logging.getLogger("LESION-DETECTOR")
     logger.info("Starting localizer training.")
 
-    env = LocalizerEnv(config)
+    metadata_path = config.get("metadata_path", "")
+    dataset_metadata = load_metadata(metadata_path)
+    env = LocalizerEnv(config, render=True)
     agent = LocalizerAgent(config)
     config = config["train"]
 
-    num_episodes = config.get("train_episodes", 100)
+    num_episodes = config.get("train_episodes", 1000)
+
+    # TODO - change so that it iterates over some/all training images
+    image_path = "../data/000001_03_01_088.png"
+    image_name = extract_filename(image_path)
+
     for episode in range(num_episodes):
-        obs = env.reset(
-            "../data/000001_03_01_088.png"
-        )  # TODO - change so that it iterates over some/all training images
-        break  # TODO
-        done = True
-        # done = False
+        image_metadata = dataset_metadata.loc[
+            dataset_metadata["File_name"] == image_name
+        ].iloc[0]
+
+        obs = env.reset(image_path, image_metadata)
+
         episode_reward = 0.0
+        done = False
         while not done:
             action = agent.select_action(obs)
             next_obs, reward, done, info = env.step(action)
@@ -32,12 +41,6 @@ def train_localizer(config):
         logger.info(f"Episode {episode} - Reward: {episode_reward}")
 
     logger.info("Localizer training finished.")
-
-    # -----
-
-    env.test()
-
-    # -----
 
 
 def test_localizer(config):

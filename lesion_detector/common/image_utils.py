@@ -2,18 +2,15 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from numpy.typing import NDArray
 from PIL import Image
 
 
-def load_metadata(path: str) -> pd.DataFrame:
-    return pd.read_csv(path)
-
-
-def load_image(path: str):
+def load_image(path: str, norm: bool = True, per_image_norm: bool = True):
     img = Image.open(path)
     img_array = np.array(img)
+    if norm:
+        return normalize(img_array, per_image_norm)
     return img_array
 
 
@@ -33,8 +30,10 @@ def show_image(img: NDArray[np.float32], title="None", cmap="gray"):
     plt.show()
 
 
-def normalize(img: NDArray[np.uint16]):
+def normalize(img: NDArray[np.uint16], per_image_norm):
     img = img.astype(np.float32)
+    if not per_image_norm:
+        return img / 65535.0
     max = np.max(img)
     min = np.min(img)
     img = (img - min) / (max - min)
