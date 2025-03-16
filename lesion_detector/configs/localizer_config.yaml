@@ -1,4 +1,4 @@
-dataset_path: ""
+data_dir: "../data"
 metadata_path: "../data/deeplesion_metadata.csv"
 
 environment:
@@ -26,6 +26,7 @@ agent:
   epsilon_end: 0.1
   epsilon_decay: 10000
   replay_buffer_size: 100000
+  image_cache_size: 1000
   batch_size: 64
 
 train:

@@ -1,9 +1,11 @@
 import numpy as np
+from localizer.image_cache import ImageCache
 from localizer.replay_buffer import ReplayBuffer
 
 
 class LocalizerAgent:
     def __init__(self, config):
+        data_dir = config.get("data_dir", "")
         self._config = config["agent"]
 
         # Initialize hyperparameters
@@ -14,9 +16,12 @@ class LocalizerAgent:
         self._epsilon_end = self._config.get("epsilon_end", 0.1)
         self._epsilon_decay = self._config.get("epsilon_decay", 10000)
 
-        # Initialize replay buffer
+        # Initialize replay buffer and cache
         capacity = self._config.get("replay_buffer_size", 100000)
         self._replay_buffer = ReplayBuffer(capacity)
+
+        cache_size = self._config.get("image_cache_size", 1000)
+        self._image_cache = ImageCache(data_dir, cache_size)
 
         self._global_step = 0
         self._epsilon = self._epsilon_start
@@ -51,6 +56,9 @@ class LocalizerAgent:
         observations, actions, rewards, next_obesrvations, dones = (
             self._replay_buffer.sample(self._batch_size)
         )
+
+        # for i in range(self._batch_size):
+        #     (bbox, image_name) =
 
         # TODO
         # Perform DQN-style update
