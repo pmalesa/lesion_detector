@@ -1,6 +1,9 @@
 import numpy as np
+from keras.optimizers import Adam
 from localizer.image_cache import ImageCache
+from localizer.networks.dqn import DQN
 from localizer.replay_buffer import ReplayBuffer
+from numpy.typing import NDArray
 
 
 class LocalizerAgent:
@@ -26,16 +29,30 @@ class LocalizerAgent:
         self._global_step = 0
         self._epsilon = self._epsilon_start
 
-    # TODO
-    def select_action(self, state):
+        # Initialize agent's network
+        self._q_network = DQN(action_dim=9)
+        self._target_network = DQN(action_dim=9)
+        self._optimizer = Adam(learning_rate=1e-4)
+
+    def select_action(self, obs: tuple[NDArray[np.float32], str]):
+        (bbox, image_name) = obs
 
         # Epsilon-greedy policy
         if np.random.rand() < self._epsilon:
             action = np.random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8])
         else:
-            # TODO
-            # Use Q-network to pick best action
-            action = np.random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8])
+            # Image data shape is (512, 512)
+            image_data = self._image_cache.get(image_name)
+
+            # Convert into (512, 512, 3), by replicating single channel
+            image_data = np.repeat(image_data[..., np.newaxis], 3, axis=-1)
+
+            # Convert into (1, 512, 512, 3), by adding batch dimension
+            image_input = np.expand_dims(image_data, axis=0)
+
+            bbox_input = np.array(bbox)[None, ...]
+            q_values = self._q_network((image_input, bbox_input))
+            action = np.argmax(q_values)
 
         return action
 
