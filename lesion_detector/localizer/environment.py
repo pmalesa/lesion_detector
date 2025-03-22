@@ -19,14 +19,15 @@ class LocalizerEnv:
         8: "FINISH",
     }
 
-    def __init__(self, config, render=False):
+    def __init__(self, config):
         self._config = config["environment"]
-        self._render = render
+        self._render = self._config["render"]
         self._image_metadata = None
 
         self._max_steps = self._config["max_steps"]
         self._initial_bbox_width = self._config["initial_bbox_width"]
         self._initial_bbox_height = self._config["initial_bbox_height"]
+        self._min_bbox_length = self._config["min_bbox_length"]
         self._move_step_factor = self._config["bbox_move_step_factor"]
         self._resize_factor = self._config["bbox_resize_factor"]
         self._iou_threshold = self._config["iou_threshold"]
@@ -95,7 +96,9 @@ class LocalizerEnv:
                 )
             case "DECREASE_WIDTH":
                 bbox_resize_step = self._calculate_resize_step(self._bbox[2])
-                self._bbox[2] = max(self._bbox[2] - bbox_resize_step, 1.0)
+                self._bbox[2] = max(
+                    self._bbox[2] - bbox_resize_step, self._min_bbox_length
+                )
             case "INCREASE_HEIGHT":
                 bbox_resize_step = self._calculate_resize_step(self._bbox[3])
                 self._bbox[3] = min(
@@ -104,7 +107,9 @@ class LocalizerEnv:
                 )
             case "DECREASE_HEIGHT":
                 bbox_resize_step = self._calculate_resize_step(self._bbox[3])
-                self._bbox[3] = max(self._bbox[3] - bbox_resize_step, 1.0)
+                self._bbox[3] = max(
+                    self._bbox[3] - bbox_resize_step, self._min_bbox_length
+                )
             case "FINISH":
                 done = True
                 iou_val = iou(self._bbox, self._target_bbox)
@@ -141,6 +146,30 @@ class LocalizerEnv:
             self._render_bboxes()
 
         return next_obs, reward, done, info
+
+    def get_available_actions(self) -> np.ndarray:
+        """
+        Returns a 1D vector/mask of actions that are avaiable to
+        be perfomed by the agent at a given step. It consists of
+        values either 0 or 1, where 1 at a given index denotes an
+        action that can be performed and 0 denotes an unavailable
+        action. This vector/mask has length equal to the number
+        of possible actions.
+        """
+
+        possible_actions = [
+            self._can_move_up(),
+            self._can_move_down(),
+            self._can_move_left(),
+            self._can_move_right(),
+            self._can_increase_width(),
+            self._can_decrease_width(),
+            self._can_increase_height(),
+            self._can_decrease_height(),
+            True,
+        ]
+
+        return np.array(possible_actions, dtype=np.int32)
 
     def _render_bboxes(self):
         """
@@ -260,3 +289,27 @@ class LocalizerEnv:
         """
 
         return max(1, round(bbox_length * self._resize_factor))
+
+    def _can_move_up(self) -> bool:
+        return self._bbox[1] > 0
+
+    def _can_move_down(self) -> bool:
+        return self._bbox[1] + self._bbox[3] < self._image_height - 1
+
+    def _can_move_left(self) -> bool:
+        return self._bbox[0] > 0
+
+    def _can_move_right(self) -> bool:
+        return self._bbox[0] + self._bbox[2] < self._image_width - 1
+
+    def _can_increase_width(self) -> bool:
+        return self._bbox[0] + self._bbox[2] < self._image_width - 1
+
+    def _can_decrease_width(self) -> bool:
+        return self._bbox[2] > self._min_bbox_length
+
+    def _can_increase_height(self) -> bool:
+        return self._bbox[1] + self._bbox[3] < self._image_height - 1
+
+    def _can_decrease_height(self) -> bool:
+        return self._bbox[3] > self._min_bbox_length

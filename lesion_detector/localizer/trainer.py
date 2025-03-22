@@ -14,7 +14,7 @@ def train_localizer(config):
 
     metadata_path = config.get("metadata_path", "")
     dataset_metadata = load_metadata(metadata_path)
-    env = LocalizerEnv(config, render=True)
+    env = LocalizerEnv(config)
     agent = LocalizerAgent(config)
     config = config["train"]
     num_episodes = config.get("train_episodes", 1000)
@@ -33,8 +33,10 @@ def train_localizer(config):
         episode_reward = 0.0
         done = False
         info = {}
+
         while not done:
-            action = agent.select_action(obs)
+            mask = env.get_available_actions()
+            action = agent.select_action(obs, mask)
             next_obs, reward, done, info = env.step(action)
             agent.store_experience((obs, action, reward, next_obs, done))
             agent.update()

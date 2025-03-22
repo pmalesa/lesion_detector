@@ -40,7 +40,7 @@ class LocalizerAgent:
         self._target_network = DQN(action_dim=9)
         self._optimizer = Adam(learning_rate=self._learning_rate)
 
-    def select_action(self, obs: tuple[NDArray[np.float32], str]):
+    def select_action(self, obs: tuple[NDArray[np.float32], str], mask: np.ndarray):
         (bbox, image_name) = obs
 
         # Epsilon-greedy policy
@@ -59,6 +59,13 @@ class LocalizerAgent:
             bbox_input = np.array(bbox)[None, ...]
 
             q_values = self._q_network((image_input, bbox_input))
+
+            # Convert the tensorflow tensor into numpy array
+            q_values = q_values.numpy()[0]
+
+            # Apply the mask to the q_values vector
+            q_values[mask == 0] = -1.0e9
+
             action = np.argmax(q_values)
 
         return action
@@ -120,6 +127,8 @@ class LocalizerAgent:
         self._epsilon = self._epsilon_start + fraction * (
             self._epsilon_end - self._epsilon_start
         )
+
+        logger.info(f"Step {self._global_step} - Loss: {loss}")
 
         return loss
 
