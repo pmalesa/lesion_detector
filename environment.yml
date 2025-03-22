@@ -10,17 +10,14 @@ dependencies:
   - matplotlib=3.9.3
   - pandas=2.2.3
 
-  # Deep learning framework
-  - tensorflow=2.17.0
-
   # Addtitional packages
   - pyyaml=6.0.2
   - types-PyYAML=6.0.12
   - opencv=4.10.0
 
   # GPU support
-  - cudatoolkit=11.8.0
-  - cudnn=9.3.0.75
+  # - cudatoolkit=11.8.0
+  # - cudnn=9.3.0.75
 
   # Include pip for pip-only packages 
   - pip
@@ -33,3 +30,5 @@ dependencies:
     - isort==5.13.2
     - mypy==1.13.0
     - pytest==8.3.4
+    - tensorflow[and-cuda]==2.17.0
+    - tensorrt==10.9.0.34

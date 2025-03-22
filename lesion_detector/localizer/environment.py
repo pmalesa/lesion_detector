@@ -27,16 +27,15 @@ class LocalizerEnv:
         self._max_steps = self._config["max_steps"]
         self._initial_bbox_width = self._config["initial_bbox_width"]
         self._initial_bbox_height = self._config["initial_bbox_height"]
-        self._move_step = self._config["bbox_move_step"]
+        self._move_step_factor = self._config["bbox_move_step_factor"]
         self._resize_factor = self._config["bbox_resize_factor"]
-
         self._iou_threshold = self._config["iou_threshold"]
-        self._iou_final_reward = self._config["iou_final_reward"]
 
         # Reward function weights
         self._alpha = self._config["reward"]["alpha"]
         self._beta = self._config["reward"]["beta"]
         self._step_penalty = self._config["reward"]["step_penalty"]
+        self._iou_final_reward = self._config["reward"]["iou_final_reward"]
 
         self._image_data = None
         self._image_name = None
@@ -77,42 +76,34 @@ class LocalizerEnv:
 
         match action:
             case "MOVE_UP":
-                self._bbox[1] = max(0, self._bbox[1] - self._move_step)
+                move_step = self._calculate_move_step(self._bbox[3])
+                self._bbox[1] = max(0, self._bbox[1] - move_step)
             case "MOVE_DOWN":
-                self._bbox[1] = min(
-                    self._image_height - 1, self._bbox[1] + self._move_step
-                )
+                move_step = self._calculate_move_step(self._bbox[3])
+                self._bbox[1] = min(self._image_height - 1, self._bbox[1] + move_step)
             case "MOVE_LEFT":
-                self._bbox[0] = max(0, self._bbox[0] - self._move_step)
+                move_step = self._calculate_move_step(self._bbox[2])
+                self._bbox[0] = max(0, self._bbox[0] - move_step)
             case "MOVE_RIGHT":
-                self._bbox[0] = min(
-                    self._image_width - 1, self._bbox[0] + self._move_step
-                )
+                move_step = self._calculate_move_step(self._bbox[2])
+                self._bbox[0] = min(self._image_width - 1, self._bbox[0] + move_step)
             case "INCREASE_WIDTH":
-                bbox_resize_step = float(
-                    max(1, round(self._bbox[2] * self._resize_factor))
-                )
+                bbox_resize_step = self._calculate_resize_step(self._bbox[2])
                 self._bbox[2] = min(
                     self._bbox[2] + bbox_resize_step,
                     self._image_width - self._bbox[0],
                 )
             case "DECREASE_WIDTH":
-                bbox_resize_step = float(
-                    max(1, round(self._bbox[2] * self._resize_factor))
-                )
+                bbox_resize_step = self._calculate_resize_step(self._bbox[2])
                 self._bbox[2] = max(self._bbox[2] - bbox_resize_step, 1.0)
             case "INCREASE_HEIGHT":
-                bbox_resize_step = float(
-                    max(1, round(self._bbox[3] * self._resize_factor))
-                )
+                bbox_resize_step = self._calculate_resize_step(self._bbox[3])
                 self._bbox[3] = min(
                     self._bbox[3] + bbox_resize_step,
                     self._image_height - self._bbox[1],
                 )
             case "DECREASE_HEIGHT":
-                bbox_resize_step = float(
-                    max(1, round(self._bbox[3] * self._resize_factor))
-                )
+                bbox_resize_step = self._calculate_resize_step(self._bbox[3])
                 self._bbox[3] = max(self._bbox[3] - bbox_resize_step, 1.0)
             case "FINISH":
                 done = True
@@ -121,12 +112,14 @@ class LocalizerEnv:
                 iou_additional_reward = 0.0
                 if iou_val >= self._iou_threshold:
                     iou_additional_reward += self._iou_final_reward
+                else:
+                    iou_additional_reward -= self._iou_final_reward
 
                 # Maybe add additional big reward for distance
                 # Or a negative reward for IoU below threshold
                 # ...
 
-                info = {"bbox": self._bbox}
+                info = {"bbox": self._bbox, "steps": self._current_step}
 
                 # if self._render:
                 #     cv2.destroyAllWindows()
@@ -141,7 +134,7 @@ class LocalizerEnv:
         next_obs = self._get_observation()
         reward = self._compute_reward()
         done = self._check_done()
-        info = {} if not done else {"bbox": self._bbox}
+        info = {} if not done else {"bbox": self._bbox, "steps": self._current_step}
         self._current_step += 1
 
         if self._render:
@@ -249,3 +242,21 @@ class LocalizerEnv:
         h_norm = bbox[3] / self._image_height
 
         return np.array([x_norm, y_norm, w_norm, h_norm], dtype=np.float32)
+
+    def _calculate_move_step(self, bbox_length: int) -> int:
+        """
+        Calculates the move step according to the defined move step
+        factor parameter and given bbox_length (either width or height).
+        Smallest possible move step is equal to 1 pixel.
+        """
+
+        return max(1, round(bbox_length * self._move_step_factor))
+
+    def _calculate_resize_step(self, bbox_length: int) -> int:
+        """
+        Calculates the resize step according to the defined resize step
+        factor parameter and given bbox_length (either width or height).
+        Smallest possible resize step is equal to 1 pixel.
+        """
+
+        return max(1, round(bbox_length * self._resize_factor))

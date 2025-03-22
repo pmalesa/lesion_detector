@@ -3,11 +3,13 @@ import logging
 from common.file_utils import extract_filename, load_metadata
 from localizer.agent import LocalizerAgent
 from localizer.environment import LocalizerEnv
+from tensorflow.config import list_physical_devices
+
+logger = logging.getLogger("LESION-DETECTOR")
 
 
-# TODO
 def train_localizer(config):
-    logger = logging.getLogger("LESION-DETECTOR")
+    show_available_devices()
     logger.info("Starting localizer training.")
 
     metadata_path = config.get("metadata_path", "")
@@ -15,7 +17,6 @@ def train_localizer(config):
     env = LocalizerEnv(config, render=True)
     agent = LocalizerAgent(config)
     config = config["train"]
-
     num_episodes = config.get("train_episodes", 1000)
 
     # TODO - change so that it iterates over some/all training images
@@ -31,6 +32,7 @@ def train_localizer(config):
 
         episode_reward = 0.0
         done = False
+        info = {}
         while not done:
             action = agent.select_action(obs)
             next_obs, reward, done, info = env.step(action)
@@ -38,7 +40,7 @@ def train_localizer(config):
             agent.update()
             episode_reward += reward
             obs = next_obs
-        logger.info(f"Episode {episode} - Reward: {episode_reward}")
+        logger.info(f"Episode {episode + 1} - Reward: {round(episode_reward, 2)}")
 
     logger.info("Localizer training finished.")
 
@@ -64,3 +66,11 @@ def test_localizer(config):
         logger.info(f"Test Episode {episode} - Reward: {episode_reward}")
 
     logger.info("Localizer testing finished.")
+
+
+def show_available_devices():
+    message = f"\n  Number of GPUs available: {len(list_physical_devices('GPU'))}"
+    message += "\n  Available devices:"
+    for device in list_physical_devices():
+        message += f"\n   - {device}"
+    logger.info(message)

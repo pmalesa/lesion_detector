@@ -1,6 +1,6 @@
 import tensorflow as tf
 from keras import Model, layers
-from keras.applications.resnet50 import ResNet50
+from keras.applications.vgg16 import VGG16
 
 
 class DQN(Model):
@@ -11,16 +11,22 @@ class DQN(Model):
     as input and outputs Q-values for action_dim discrete actions
     """
 
-    def __init__(self, pretrained=False, action_dim=9, image_shape=(512, 512, 3)):
+    def __init__(self, action_dim=9, image_shape=(512, 512, 3)):
         super().__init__()
 
         self._action_dim = action_dim
         self._image_shape = image_shape
 
-        base_model = ResNet50(include_top=False, input_shape=image_shape, pooling="avg")
+        self._cnn = VGG16(include_top=False, input_shape=image_shape, pooling="avg")
+        for layer in self._cnn.layers:
+            layer.trainable = False
 
-        self._cnn = base_model
+        # Unfreeze the last trainale Conv layer at position -3
+        self._cnn.layers[-3].trainable = True
+
         self._cnn_out_dim = 2048
+
+        # TODO - Maybe set the last layer of the CNN as trainable ...
 
         # MLP component for bounding box parameters
         self._bbox_mlp = tf.keras.Sequential(
@@ -42,7 +48,7 @@ class DQN(Model):
         """
         super().build(input_shape)
 
-    def call(self, inputs, training=False):
+    def call(self, inputs):
         """
         Method being a single forward pass through the network.
         The training parameter can be used to specify different
@@ -54,12 +60,14 @@ class DQN(Model):
 
         img_tensor, bbox_coords = inputs
 
-        img_features = self._cnn(img_tensor, training=training)
+        img_features = self._cnn(img_tensor, training=False)
 
-        bbox_features = self._bbox_mlp(bbox_coords, training=training)
+        bbox_features = self._bbox_mlp(bbox_coords, training=True)
+
+        # Add history of 10 previous actions ...
 
         combined = tf.concat([img_features, bbox_features], axis=-1)
 
-        q_values = self._comb_mlp(combined, training=training)
+        q_values = self._comb_mlp(combined, training=True)
 
         return q_values

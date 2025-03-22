@@ -2,35 +2,32 @@ data_dir: "../data"
 metadata_path: "../data/deeplesion_metadata.csv"
 
 environment:
-  max_steps: 100 # Max steps the agent can take before the episode ends
-  bbox_move_step: 5
-  bbox_resize_factor: 0.05
-  initial_bbox_width: 20
-  initial_bbox_height: 20
-  bbox_crop_width: 64
-  bbox_crop_height: 64
-  image_crop_width: 512 # Only for images of size different than 512x512
-  image_crop_height: 512 # Only for images of size different than 512x512
+  max_steps: 100                        # Max steps the agent can take before the episode ends
+  bbox_move_step_factor: 0.1
+  bbox_resize_factor: 0.1
+  initial_bbox_width: 50
+  initial_bbox_height: 50
   iou_threshold: 0.7
-  iou_final_reward: 5.0 # Additional, big reward on finishing step, when IoU >= threshold
 
   reward:
-    alpha: 5.0  # Weight of the IoU reward component
-    beta: 2.0   # Weight of the center distance reward component 
-    step_penalty: -0.1
+    alpha: 5.0                          # Weight of the IoU reward component
+    beta: 1.0                           # Weight of the center distance reward component 
+    step_penalty: -1
+    iou_final_reward: 10.0              # Additional, big reward on finishing step, when IoU >= threshold
 
 agent:
   learning_rate: 0.0001
-  gamma: 0.99 # discount factor
+  gamma: 0.99                           # discount factor
   epsilon_start: 1.0
   epsilon_end: 0.1
-  epsilon_decay: 10000
+  epsilon_decay: 500  # 10000
   replay_buffer_size: 100000
-  image_cache_size: 100 # == replay_buffer_size / (train_episodes * max_steps)
-  batch_size: 64
+  image_cache_size: 100                 # == replay_buffer_size / (train_episodes * max_steps)
+  target_update_steps: 100              # number of steps after which the target network is updated
+  batch_size: 2 # 64
 
 train:
-  train_episodes: 10
+  train_episodes: 1000
   log_interval: 10                      # print/log progress every X episodes
   save_interval: 50                     # chackpoint model every X episodes
   output_dir: "../runs/localizer/logs"  # path for saving logs, checkpoints etc.
