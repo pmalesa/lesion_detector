@@ -2,12 +2,13 @@ data_dir: "../data"
 metadata_path: "../data/deeplesion_metadata.csv"
 
 environment:
-  render: false
+  render: true
   max_steps: 100                        # Max steps the agent can take before the episode ends
   bbox_move_step_factor: 0.1
   bbox_resize_factor: 0.1
   initial_bbox_width: 50
   initial_bbox_height: 50
+  bbox_pixel_margin: 10                 # Number of margin pixels around the bounding box (in every direction)
   min_bbox_length: 10                   # Minimal bounding box width/height
   iou_threshold: 0.7
 
@@ -22,11 +23,10 @@ agent:
   gamma: 0.99                           # discount factor
   epsilon_start: 1.0
   epsilon_end: 0.1
-  epsilon_decay: 20  # 10000
-  replay_buffer_size: 100000
-  image_cache_size: 100                 # == replay_buffer_size / (train_episodes * max_steps)
+  epsilon_decay: 100
+  replay_buffer_size: 10000
   target_update_steps: 10               # number of steps after which the target network is updated
-  batch_size: 2 # 64
+  batch_size: 16 # 64
 
 train:
   train_episodes: 1000

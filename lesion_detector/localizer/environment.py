@@ -27,6 +27,7 @@ class LocalizerEnv:
         self._max_steps = self._config["max_steps"]
         self._initial_bbox_width = self._config["initial_bbox_width"]
         self._initial_bbox_height = self._config["initial_bbox_height"]
+        self._bbox_pixel_margin = self._config["bbox_pixel_margin"]
         self._min_bbox_length = self._config["min_bbox_length"]
         self._move_step_factor = self._config["bbox_move_step_factor"]
         self._resize_factor = self._config["bbox_resize_factor"]
@@ -192,13 +193,22 @@ class LocalizerEnv:
         cv2.imshow("Rendered Image", rgb)
         cv2.waitKey(10)
 
-    def _get_observation(self) -> tuple[NDArray[np.float32], str]:
+    def _get_observation(self) -> NDArray[np.float32]:
         """
         Returns the observation as a tuple containing
-        normalized current bounding box data and image filename.
+        cropped image from the current bounding box
+        and a vector of 10 previous actions.
         """
 
-        return (self._normalize_bbox(self._bbox), self._image_name)
+        (x, y, w, h) = self._bbox
+
+        x_1 = max(0, x - self._bbox_pixel_margin)
+        y_1 = max(0, y - self._bbox_pixel_margin)
+
+        x_2 = min(self._image_width - 1, x + w + self._bbox_pixel_margin)
+        y_2 = min(self._image_height - 1, y + h + self._bbox_pixel_margin)
+
+        return self._image_data[y_1:y_2, x_1:x_2]
 
     def _compute_reward(self) -> float:
         """

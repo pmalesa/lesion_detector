@@ -1,5 +1,6 @@
 import logging
 
+import numpy as np
 from common.file_utils import extract_filename, load_metadata
 from localizer.agent import LocalizerAgent
 from localizer.environment import LocalizerEnv
@@ -31,6 +32,7 @@ def train_localizer(config):
         obs = env.reset(image_path, image_metadata)
 
         episode_reward = 0.0
+        losses = []
         done = False
         info = {}
 
@@ -39,10 +41,15 @@ def train_localizer(config):
             action = agent.select_action(obs, mask)
             next_obs, reward, done, info = env.step(action)
             agent.store_experience((obs, action, reward, next_obs, done))
-            agent.update()
+            loss = agent.update()
             episode_reward += reward
+            if loss:
+                losses.append(float(loss))
             obs = next_obs
-        logger.info(f"Episode {episode + 1} - Reward: {round(episode_reward, 2)}")
+        mean_loss = round(np.mean(losses), 2)
+        logger.info(
+            f"Episode {episode + 1} - Mean Loss: {mean_loss} | Reward: {round(episode_reward, 2)}"
+        )
 
     logger.info("Localizer training finished.")
 

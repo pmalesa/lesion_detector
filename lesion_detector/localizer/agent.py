@@ -1,9 +1,9 @@
 import logging
 
+import cv2
 import numpy as np
 import tensorflow as tf
 from keras.optimizers import Adam
-from localizer.image_cache import ImageCache
 from localizer.networks.dqn import DQN
 from localizer.replay_buffer import ReplayBuffer
 from numpy.typing import NDArray
@@ -13,7 +13,6 @@ logger = logging.getLogger("LESION-DETECTOR")
 
 class LocalizerAgent:
     def __init__(self, config):
-        data_dir = config.get("data_dir", "")
         self._config = config["agent"]
 
         # Initialize hyperparameters
@@ -24,41 +23,37 @@ class LocalizerAgent:
         self._epsilon_end = self._config.get("epsilon_end", 0.1)
         self._epsilon_decay = self._config.get("epsilon_decay", 10000)
         self._target_update_steps = self._config.get("target_update_steps", 100)
+        self._image_patch_size = self._config.get("image_patch_size", 128)
 
         # Initialize replay buffer and cache
         capacity = self._config.get("replay_buffer_size", 100000)
         self._replay_buffer = ReplayBuffer(capacity)
 
-        cache_size = self._config.get("image_cache_size", 1000)
-        self._image_cache = ImageCache(data_dir, cache_size)
-
         self._global_step = 0
         self._epsilon = self._epsilon_start
 
         # Initialize agent's network
-        self._q_network = DQN(action_dim=9)
-        self._target_network = DQN(action_dim=9)
+        image_shape = (self._image_patch_size, self._image_patch_size, 3)
+        self._q_network = DQN(action_dim=9, image_shape=image_shape)
+        self._target_network = DQN(action_dim=9, image_shape=image_shape)
         self._optimizer = Adam(learning_rate=self._learning_rate)
 
-    def select_action(self, obs: tuple[NDArray[np.float32], str], mask: np.ndarray):
-        (bbox, image_name) = obs
-
+    def select_action(self, obs: NDArray[np.float32], mask: np.ndarray):
         # Epsilon-greedy policy
         if np.random.rand() < self._epsilon:
             action = np.random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8])
         else:
             # Image data shape is (512, 512)
-            image_data = self._image_cache.get(image_name)
+            resized_patch = self._resize_patch(obs)
 
-            # Convert into (512, 512, 3), by replicating single channel
-            image_data = np.repeat(image_data[..., np.newaxis], 3, axis=-1)
+            # Replicate patch across three channels
+            patch_data = np.repeat(resized_patch[..., np.newaxis], 3, axis=-1)
 
-            # Convert into (1, 512, 512, 3), by adding batch dimension
-            image_input = np.expand_dims(image_data, axis=0)
+            # Convert into (1, patch_width, patch_height, 3), by adding batch dimension
+            patch_input = np.expand_dims(patch_data, axis=0)
 
-            bbox_input = np.array(bbox)[None, ...]
-
-            q_values = self._q_network((image_input, bbox_input))
+            # TODO - Add vector of 10 previous acitons
+            q_values = self._q_network(patch_input)
 
             # Convert the tensorflow tensor into numpy array
             q_values = q_values.numpy()[0]
@@ -128,35 +123,29 @@ class LocalizerAgent:
             self._epsilon_end - self._epsilon_start
         )
 
-        logger.info(f"Step {self._global_step} - Loss: {loss}")
-
         return loss
 
-    def _prepare_batch(self, observations: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def _prepare_batch(self, observations: np.ndarray) -> np.ndarray:
         """
-        Takes observations as an array of tuples (bbox, img_name),
-        and returns them as an array of tuples (img_tensor, bbox_tensor), where:
-        - img_tensor has shape (batch, 512, 512, 3)
-        - bbox_tensor has shape (batch, 4)
+        Takes observations as an array of image patches of various size,
+        and returns them as an array of fixed-sized image patches (128 x 128 pixels).
         """
 
-        bbox_batch = []
-        img_batch = []
-
-        for i in range(len(observations)):
-            (bbox, img_name) = observations[i]
-
-            # Get image data from cache
-            img_data = self._image_cache.get(img_name)
+        resized_observations = []
+        for img_patch in observations:
+            resized_patch = self._resize_patch(img_patch)
 
             # Replicate grayscale channel across 3 channels
-            img_data = np.repeat(img_data[..., np.newaxis], 3, axis=-1)
+            resized_patch = np.repeat(resized_patch[..., np.newaxis], 3, axis=-1)
 
-            bbox_batch.append(bbox)
-            img_batch.append(img_data)
+            resized_observations.append(resized_patch)
 
-        # Convert to numpy arrays
-        img_tensor = np.array(img_batch, dtype=np.float32)
-        bbox_tensor = np.array(bbox_batch, dtype=np.float32)
+        return np.array(resized_observations, dtype=np.float32)
 
-        return img_tensor, bbox_tensor
+    def _resize_patch(self, img_patch: np.ndarray) -> np.ndarray:
+        """
+        Resizes the cropped image patch into a fixed sized patch.
+        """
+
+        patch_shape = (self._image_patch_size, self._image_patch_size)
+        return cv2.resize(img_patch, patch_shape, interpolation=cv2.INTER_AREA)

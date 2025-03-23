@@ -11,7 +11,7 @@ class DQN(Model):
     as input and outputs Q-values for action_dim discrete actions
     """
 
-    def __init__(self, action_dim=9, image_shape=(512, 512, 3)):
+    def __init__(self, action_dim=9, image_shape=(128, 128, 3)):
         super().__init__()
 
         self._action_dim = action_dim
@@ -23,15 +23,12 @@ class DQN(Model):
 
         # Unfreeze the last trainale Conv layer at position -3
         self._cnn.layers[-3].trainable = True
-
         self._cnn_out_dim = 2048
 
-        # TODO - Maybe set the last layer of the CNN as trainable ...
-
-        # MLP component for bounding box parameters
-        self._bbox_mlp = tf.keras.Sequential(
-            [layers.Dense(32, activation="relu"), layers.Dense(32, activation="relu")]
-        )
+        # # MLP component for bounding box parameters
+        # self._bbox_mlp = tf.keras.Sequential(
+        #     [layers.Dense(32, activation="relu"), layers.Dense(32, activation="relu")]
+        # )
 
         # Combined MLP (Q-network)
         self._comb_mlp = tf.keras.Sequential(
@@ -48,26 +45,24 @@ class DQN(Model):
         """
         super().build(input_shape)
 
+    # TODO
     def call(self, inputs):
         """
         Method being a single forward pass through the network.
         The training parameter can be used to specify different
         behaviour during training and inference.
-        inputs argument is a tuple (img_tensor, bbox_coords), where:
-        - img_tensor has shape (batch, 512, 512, 3)
-        - bbox_coords has shape (batch, 4)
+        inputs argument is a 2D array of cropped patch pixel data
+        of shape (batch, patch_data)
         """
 
-        img_tensor, bbox_coords = inputs
+        img_patch_tensor = inputs
 
-        img_features = self._cnn(img_tensor, training=False)
-
-        bbox_features = self._bbox_mlp(bbox_coords, training=True)
+        # TODO check if the training parameter is necessary
+        img_features = self._cnn(img_patch_tensor, training=False)
 
         # Add history of 10 previous actions ...
+        # combined = tf.concat([img_features, bbox_features], axis=-1)
 
-        combined = tf.concat([img_features, bbox_features], axis=-1)
-
-        q_values = self._comb_mlp(combined, training=True)
+        q_values = self._comb_mlp(img_features, training=True)
 
         return q_values
