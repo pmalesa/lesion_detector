@@ -29,10 +29,10 @@ class ReplayBuffer:
         batch = random.sample(self._buffer, batch_size)
         observations, actions, rewards, next_observations, dones = zip(*batch)
         return (
-            list(observations),
+            np.array(observations, dtype=object),
             np.array(actions, dtype=np.int32),
             np.array(rewards, dtype=np.float32),
-            list(next_observations),
+            np.array(next_observations, dtype=object),
             np.array(dones, dtype=np.int32),
         )
 

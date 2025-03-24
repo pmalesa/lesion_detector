@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from common.image_utils import load_image
 from common.metrics import dist, iou
+from localizer.utils.action_history import ActionHistory
 from numpy.typing import NDArray
 
 
@@ -21,23 +22,29 @@ class LocalizerEnv:
 
     def __init__(self, config):
         self._config = config["environment"]
-        self._render = self._config["render"]
+        self._render = self._config.get("render", False)
         self._image_metadata = None
 
-        self._max_steps = self._config["max_steps"]
-        self._initial_bbox_width = self._config["initial_bbox_width"]
-        self._initial_bbox_height = self._config["initial_bbox_height"]
-        self._bbox_pixel_margin = self._config["bbox_pixel_margin"]
-        self._min_bbox_length = self._config["min_bbox_length"]
-        self._move_step_factor = self._config["bbox_move_step_factor"]
-        self._resize_factor = self._config["bbox_resize_factor"]
-        self._iou_threshold = self._config["iou_threshold"]
+        self._max_steps = self._config.get("max_steps", 100)
+        self._initial_bbox_width = self._config.get("initial_bbox_width", 50)
+        self._initial_bbox_height = self._config.get("initial_bbox_height", 50)
+        self._bbox_pixel_margin = self._config.get("bbox_pixel_margin", 10)
+        self._min_bbox_length = self._config.get("min_bbox_length", 10)
+        self._max_bbox_length = self._config.get("max_bbox_length", 128)
+        self._move_step_factor = self._config.get("bbox_move_step_factor", 0.1)
+        self._resize_factor = self._config.get("bbox_resize_factor", 0.1)
+        self._iou_threshold = self._config.get("iou_threshold", 0.7)
+        self._n_previous_actions = self._config.get("n_previous_actions", 10)
+        self._action_history = ActionHistory(
+            length=self._n_previous_actions, n_actions=9
+        )
 
         # Reward function weights
-        self._alpha = self._config["reward"]["alpha"]
-        self._beta = self._config["reward"]["beta"]
-        self._step_penalty = self._config["reward"]["step_penalty"]
-        self._iou_final_reward = self._config["reward"]["iou_final_reward"]
+        self._config = self._config["reward"]
+        self._alpha = self._config.get("alpha", 5.0)
+        self._beta = self._config.get("beta", 1.0)
+        self._step_penalty = self._config.get("step_penalty", -1.0)
+        self._iou_final_reward = self._config.get("iou_final_reward", 10.0)
 
         self._image_data = None
         self._image_name = None
@@ -59,6 +66,7 @@ class LocalizerEnv:
         and the coordinates of the target bounding box
         """
 
+        self._action_history.clear()
         self._init_image_data(image_path, image_metadata)
         self._init_target_bbox()
         self._reset_bbox()
@@ -74,6 +82,8 @@ class LocalizerEnv:
         """
         Performs a step, given a specific action ID.
         """
+
+        self._action_history.add(action_id)
         action = self.ACTIONS[action_id]
 
         match action:
@@ -91,10 +101,11 @@ class LocalizerEnv:
                 self._bbox[0] = min(self._image_width - 1, self._bbox[0] + move_step)
             case "INCREASE_WIDTH":
                 bbox_resize_step = self._calculate_resize_step(self._bbox[2])
-                self._bbox[2] = min(
+                new_width = min(
                     self._bbox[2] + bbox_resize_step,
                     self._image_width - self._bbox[0],
                 )
+                self._bbox[2] = min(new_width, self._max_bbox_length)
             case "DECREASE_WIDTH":
                 bbox_resize_step = self._calculate_resize_step(self._bbox[2])
                 self._bbox[2] = max(
@@ -102,10 +113,11 @@ class LocalizerEnv:
                 )
             case "INCREASE_HEIGHT":
                 bbox_resize_step = self._calculate_resize_step(self._bbox[3])
-                self._bbox[3] = min(
+                new_height = min(
                     self._bbox[3] + bbox_resize_step,
                     self._image_height - self._bbox[1],
                 )
+                self._bbox[3] = min(new_height, self._max_bbox_length)
             case "DECREASE_HEIGHT":
                 bbox_resize_step = self._calculate_resize_step(self._bbox[3])
                 self._bbox[3] = max(
@@ -195,9 +207,20 @@ class LocalizerEnv:
 
     def _get_observation(self) -> NDArray[np.float32]:
         """
-        Returns the observation as a tuple containing
-        cropped image from the current bounding box
-        and a vector of 10 previous actions.
+        Returns the observation as a tuple containing cropped
+        image from the current bounding box (+ margin) and a
+        vector of 10 previous actions.
+        """
+
+        return (
+            self._get_patch_with_margin(),
+            self._action_history.get_history_vector(),
+        )
+
+    def _get_patch_with_margin(self) -> NDArray[np.float32]:
+        """
+        Returns 2D np.array of pixel data from within the current
+        bounding box with additional margin (10 pixels by default).
         """
 
         (x, y, w, h) = self._bbox
@@ -313,13 +336,17 @@ class LocalizerEnv:
         return self._bbox[0] + self._bbox[2] < self._image_width - 1
 
     def _can_increase_width(self) -> bool:
-        return self._bbox[0] + self._bbox[2] < self._image_width - 1
+        cond_1 = self._bbox[2] < self._max_bbox_length
+        cond_2 = self._bbox[0] + self._bbox[2] < self._image_width - 1
+        return cond_1 and cond_2
 
     def _can_decrease_width(self) -> bool:
         return self._bbox[2] > self._min_bbox_length
 
     def _can_increase_height(self) -> bool:
-        return self._bbox[1] + self._bbox[3] < self._image_height - 1
+        cond_1 = self._bbox[3] < self._max_bbox_length
+        cond_2 = self._bbox[1] + self._bbox[3] < self._image_height - 1
+        return cond_1 and cond_2
 
     def _can_decrease_height(self) -> bool:
         return self._bbox[3] > self._min_bbox_length

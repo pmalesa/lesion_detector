@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 from keras.optimizers import Adam
 from localizer.networks.dqn import DQN
-from localizer.replay_buffer import ReplayBuffer
+from localizer.utils.replay_buffer import ReplayBuffer
 from numpy.typing import NDArray
 
 logger = logging.getLogger("LESION-DETECTOR")
@@ -26,7 +26,7 @@ class LocalizerAgent:
         self._image_patch_size = self._config.get("image_patch_size", 128)
 
         # Initialize replay buffer and cache
-        capacity = self._config.get("replay_buffer_size", 100000)
+        capacity = self._config.get("replay_buffer_size", 10000)
         self._replay_buffer = ReplayBuffer(capacity)
 
         self._global_step = 0
@@ -41,19 +41,24 @@ class LocalizerAgent:
     def select_action(self, obs: NDArray[np.float32], mask: np.ndarray):
         # Epsilon-greedy policy
         if np.random.rand() < self._epsilon:
-            action = np.random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8])
+            allowed_actions = np.where(mask == 1)[0]
+            action = np.random.choice(allowed_actions)
         else:
-            # Image data shape is (512, 512)
-            resized_patch = self._resize_patch(obs)
+            (img_patch, prev_actions) = obs
 
-            # Replicate patch across three channels
+            # Resize patch to a fixed size (128, 128)
+            resized_patch = self._resize_patch(img_patch)
+
+            # Replicate patch across three channels (128, 128, 3)
             patch_data = np.repeat(resized_patch[..., np.newaxis], 3, axis=-1)
 
-            # Convert into (1, patch_width, patch_height, 3), by adding batch dimension
+            # Convert into (1, 128, 128, 3), by adding batch dimension
             patch_input = np.expand_dims(patch_data, axis=0)
 
-            # TODO - Add vector of 10 previous acitons
-            q_values = self._q_network(patch_input)
+            # Convert into (1, 90), by adding batch dimension
+            prev_actions_input = np.expand_dims(prev_actions, axis=0)
+
+            q_values = self._q_network((patch_input, prev_actions_input))
 
             # Convert the tensorflow tensor into numpy array
             q_values = q_values.numpy()[0]
@@ -125,22 +130,32 @@ class LocalizerAgent:
 
         return loss
 
-    def _prepare_batch(self, observations: np.ndarray) -> np.ndarray:
+    def _prepare_batch(self, observations: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """
-        Takes observations as an array of image patches of various size,
-        and returns them as an array of fixed-sized image patches (128 x 128 pixels).
+        Takes observations as an array of tuples with image patch of various size
+        and a vector of history of previous actions. It returns them as tuple with
+        two arrays (resized_patch_tensor, prev_actions_tensor), where the resized
+        patch has a fixed-sized (128 x 128 pixels by default).
         """
 
-        resized_observations = []
-        for img_patch in observations:
+        resized_patch_batch = []
+        prev_actions_batch = []
+
+        for obs in observations:
+            (img_patch, prev_actions) = obs
+
             resized_patch = self._resize_patch(img_patch)
 
             # Replicate grayscale channel across 3 channels
             resized_patch = np.repeat(resized_patch[..., np.newaxis], 3, axis=-1)
 
-            resized_observations.append(resized_patch)
+            resized_patch_batch.append(resized_patch)
+            prev_actions_batch.append(prev_actions)
 
-        return np.array(resized_observations, dtype=np.float32)
+        resized_patch_tensor = np.array(resized_patch_batch, dtype=np.float32)
+        prev_actions_tensor = np.array(prev_actions_batch, dtype=np.float32)
+
+        return resized_patch_tensor, prev_actions_tensor
 
     def _resize_patch(self, img_patch: np.ndarray) -> np.ndarray:
         """

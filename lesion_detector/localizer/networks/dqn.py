@@ -25,10 +25,10 @@ class DQN(Model):
         self._cnn.layers[-3].trainable = True
         self._cnn_out_dim = 2048
 
-        # # MLP component for bounding box parameters
-        # self._bbox_mlp = tf.keras.Sequential(
-        #     [layers.Dense(32, activation="relu"), layers.Dense(32, activation="relu")]
-        # )
+        # # MLP component for previous actons
+        self._hist_mlp = tf.keras.Sequential(
+            [layers.Dense(64, activation="relu"), layers.Dense(32, activation="relu")]
+        )
 
         # Combined MLP (Q-network)
         self._comb_mlp = tf.keras.Sequential(
@@ -45,24 +45,23 @@ class DQN(Model):
         """
         super().build(input_shape)
 
-    # TODO
     def call(self, inputs):
         """
         Method being a single forward pass through the network.
-        The training parameter can be used to specify different
-        behaviour during training and inference.
         inputs argument is a 2D array of cropped patch pixel data
-        of shape (batch, patch_data)
+        and previous actions of shape (batch, patch_data, prev_actions)
         """
 
-        img_patch_tensor = inputs
+        img_patch_tensor, prev_actions_tensor = inputs
 
-        # TODO check if the training parameter is necessary
+        # training=True means that there will be updates made on
+        # batch norm layers if needed. It will not freeze the unfreezed layers!
         img_features = self._cnn(img_patch_tensor, training=False)
 
-        # Add history of 10 previous actions ...
-        # combined = tf.concat([img_features, bbox_features], axis=-1)
+        history_features = self._hist_mlp(prev_actions_tensor, training=True)
 
-        q_values = self._comb_mlp(img_features, training=True)
+        combined = tf.concat([img_features, history_features], axis=-1)
+
+        q_values = self._comb_mlp(combined, training=True)
 
         return q_values

@@ -10,12 +10,14 @@ environment:
   initial_bbox_height: 50
   bbox_pixel_margin: 10                 # Number of margin pixels around the bounding box (in every direction)
   min_bbox_length: 10                   # Minimal bounding box width/height
+  max_bbox_length: 128                  # Maximal bounding box width/height
+  n_previous_actions: 10                # Number of previous actions stored in the observation
   iou_threshold: 0.7
 
   reward:
     alpha: 5.0                          # Weight of the IoU reward component
     beta: 1.0                           # Weight of the center distance reward component 
-    step_penalty: -1
+    step_penalty: -1.0
     iou_final_reward: 10.0              # Additional, big reward on finishing step, when IoU >= threshold
 
 agent:
@@ -26,7 +28,8 @@ agent:
   epsilon_decay: 100
   replay_buffer_size: 10000
   target_update_steps: 10               # number of steps after which the target network is updated
-  batch_size: 16 # 64
+  batch_size: 32 # 64
+  image_patch_size: 128
 
 train:
   train_episodes: 1000
