@@ -100,43 +100,15 @@ class LocalizerEnv:
                 move_step = self._calculate_move_step(self._bbox[2])
                 self._bbox[0] = min(self._image_width - 1, self._bbox[0] + move_step)
             case "INCREASE_WIDTH":
-                bbox_resize_step = self._calculate_resize_step(self._bbox[2])
-                new_width = min(
-                    self._bbox[2] + bbox_resize_step,
-                    self._image_width - self._bbox[0],
-                )
-                self._bbox[2] = min(new_width, self._max_bbox_length)
+                self._increase_width()
             case "DECREASE_WIDTH":
-                bbox_resize_step = self._calculate_resize_step(self._bbox[2])
-                self._bbox[2] = max(
-                    self._bbox[2] - bbox_resize_step, self._min_bbox_length
-                )
+                self._decrease_width()
             case "INCREASE_HEIGHT":
-                bbox_resize_step = self._calculate_resize_step(self._bbox[3])
-                new_height = min(
-                    self._bbox[3] + bbox_resize_step,
-                    self._image_height - self._bbox[1],
-                )
-                self._bbox[3] = min(new_height, self._max_bbox_length)
+                self._increase_height()
             case "DECREASE_HEIGHT":
-                bbox_resize_step = self._calculate_resize_step(self._bbox[3])
-                self._bbox[3] = max(
-                    self._bbox[3] - bbox_resize_step, self._min_bbox_length
-                )
+                self._decrease_height()
             case "FINISH":
                 done = True
-                iou_val = iou(self._bbox, self._target_bbox)
-
-                iou_additional_reward = 0.0
-                if iou_val >= self._iou_threshold:
-                    iou_additional_reward += self._iou_final_reward
-                else:
-                    iou_additional_reward -= self._iou_final_reward
-
-                # Maybe add additional big reward for distance
-                # Or a negative reward for IoU below threshold
-                # ...
-
                 info = {"bbox": self._bbox, "steps": self._current_step}
 
                 # if self._render:
@@ -144,7 +116,7 @@ class LocalizerEnv:
 
                 return (
                     self._get_observation(),
-                    self._compute_reward() + iou_additional_reward,
+                    self._compute_final_reward(),
                     done,
                     info,
                 )
@@ -250,7 +222,29 @@ class LocalizerEnv:
         iou_reward = self._alpha * iou_val
         center_reward = self._beta * (1.0 - dist_val_norm)
 
+        # TODO - Maybe add rewards based on IoU and distance change
+
         return iou_reward + center_reward + self._step_penalty
+
+    def _compute_final_reward(self) -> float:
+        """
+        Computes the reward after conducting the FINAL action,
+        which ends an episode.
+        """
+
+        iou_val = iou(self._bbox, self._target_bbox)
+
+        additional_reward = 0.0
+        if iou_val >= self._iou_threshold:
+            additional_reward += self._iou_final_reward
+        else:
+            additional_reward -= (1.0 - iou_val) * self._iou_final_reward
+
+        # TODO - Maybe add additional big reward for distance
+        # Or a negative reward for IoU below threshold
+        # ...
+
+        return self._compute_reward() + additional_reward
 
     def _init_image_data(self, image_path: str, image_metadata: pd.DataFrame):
         """
@@ -318,10 +312,65 @@ class LocalizerEnv:
         """
         Calculates the resize step according to the defined resize step
         factor parameter and given bbox_length (either width or height).
-        Smallest possible resize step is equal to 1 pixel.
+        Smallest possible resize step is equal to 1 pixel. It is
+        multiplied by 0.5, because this resize step is used two times,
+        once to move the top edge and senond time to move the bottom one
+        (or right edge and left edge).
         """
 
-        return max(1, round(bbox_length * self._resize_factor))
+        return max(1, round(0.5 * bbox_length * self._resize_factor))
+
+    def _increase_width(self):
+        x, w = self._bbox[0], self._bbox[2]
+        step = self._calculate_resize_step(w)
+
+        x_new = max(0, x - step)
+        w_new = min(self._max_bbox_length, w + 2 * step)
+
+        if x_new + w_new > self._image_width:
+            w_new = self._image_width - x_new
+
+        self._bbox[0] = x_new
+        self._bbox[2] = w_new
+
+    def _decrease_width(self):
+        x, w = self._bbox[0], self._bbox[2]
+        step = self._calculate_resize_step(w)
+
+        x_new = x + step
+        w_new = w - 2 * step
+
+        if x_new + w_new > self._image_width:
+            w_new = self._image_width - x_new
+
+        self._bbox[0] = x_new
+        self._bbox[2] = w_new
+
+    def _increase_height(self):
+        y, h = self._bbox[1], self._bbox[3]
+        step = self._calculate_resize_step(h)
+
+        y_new = max(0, y - step)
+        h_new = min(self._max_bbox_length, h + 2 * step)
+
+        if y_new + h_new > self._image_width:
+            h_new = self._image_width - y_new
+
+        self._bbox[1] = y_new
+        self._bbox[3] = h_new
+
+    def _decrease_height(self):
+        y, h = self._bbox[1], self._bbox[3]
+        step = self._calculate_resize_step(h)
+
+        y_new = y + step
+        h_new = h - 2 * step
+
+        if y_new + h_new > self._image_width:
+            h_new = self._image_width - y_new
+
+        self._bbox[1] = y_new
+        self._bbox[3] = h_new
 
     def _can_move_up(self) -> bool:
         return self._bbox[1] > 0
@@ -336,17 +385,13 @@ class LocalizerEnv:
         return self._bbox[0] + self._bbox[2] < self._image_width - 1
 
     def _can_increase_width(self) -> bool:
-        cond_1 = self._bbox[2] < self._max_bbox_length
-        cond_2 = self._bbox[0] + self._bbox[2] < self._image_width - 1
-        return cond_1 and cond_2
+        return self._bbox[2] < self._max_bbox_length
 
     def _can_decrease_width(self) -> bool:
         return self._bbox[2] > self._min_bbox_length
 
     def _can_increase_height(self) -> bool:
-        cond_1 = self._bbox[3] < self._max_bbox_length
-        cond_2 = self._bbox[1] + self._bbox[3] < self._image_height - 1
-        return cond_1 and cond_2
+        return self._bbox[3] < self._max_bbox_length
 
     def _can_decrease_height(self) -> bool:
         return self._bbox[3] > self._min_bbox_length

@@ -23,7 +23,7 @@ class LocalizerAgent:
         self._epsilon_end = self._config.get("epsilon_end", 0.1)
         self._epsilon_decay = self._config.get("epsilon_decay", 10000)
         self._target_update_steps = self._config.get("target_update_steps", 100)
-        self._image_patch_size = self._config.get("image_patch_size", 128)
+        self._fixed_patch_length = self._config.get("fixed_patch_length", 128)
 
         # Initialize replay buffer and cache
         capacity = self._config.get("replay_buffer_size", 10000)
@@ -33,7 +33,7 @@ class LocalizerAgent:
         self._epsilon = self._epsilon_start
 
         # Initialize agent's network
-        image_shape = (self._image_patch_size, self._image_patch_size, 3)
+        image_shape = (self._fixed_patch_length, self._fixed_patch_length, 3)
         self._q_network = DQN(action_dim=9, image_shape=image_shape)
         self._target_network = DQN(action_dim=9, image_shape=image_shape)
         self._optimizer = Adam(learning_rate=self._learning_rate)
@@ -160,7 +160,11 @@ class LocalizerAgent:
     def _resize_patch(self, img_patch: np.ndarray) -> np.ndarray:
         """
         Resizes the cropped image patch into a fixed sized patch.
+        If the size is already correct, then the input image
+        patch is returned with no resizing.
         """
 
-        patch_shape = (self._image_patch_size, self._image_patch_size)
-        return cv2.resize(img_patch, patch_shape, interpolation=cv2.INTER_AREA)
+        fixed_shape = (self._fixed_patch_length, self._fixed_patch_length)
+        if img_patch.shape == fixed_shape:
+            return img_patch
+        return cv2.resize(img_patch, fixed_shape, interpolation=cv2.INTER_AREA)
