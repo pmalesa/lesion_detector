@@ -42,10 +42,13 @@ class LocalizerEnv:
 
         # Reward function weights
         self._config = self._config["reward"]
-        self._alpha = self._config.get("alpha", 5.0)
+        self._alpha_1 = self._config.get("alpha_1", 5.0)
+        self._alpha_2 = self._config.get("alpha_2", 5.0)
         self._beta = self._config.get("beta", 1.0)
         self._step_penalty = self._config.get("step_penalty", -1.0)
         self._iou_final_reward = self._config.get("iou_final_reward", 10.0)
+        self._prev_dist = None
+        self._prev_iou = None
 
         self._image_data = None
         self._image_name = None
@@ -72,6 +75,8 @@ class LocalizerEnv:
         self._init_target_bbox()
         self._reset_bbox()
         self._current_step = 1
+        self._prev_dist = None
+        self._prev_iou = None
 
         if self._render:
             cv2.namedWindow("Rendered Image", cv2.WINDOW_NORMAL)
@@ -210,7 +215,8 @@ class LocalizerEnv:
         """
         Computes the reward, that includes three components:
         * Component proportional to the IoU metric,
-        * Component inversely proportional to the distance between centers,
+        * Component proportional to the IoU metric change,
+        * Component inversely proportional to the distance change between centers,
         * Step penalty component.
         """
 
@@ -218,14 +224,22 @@ class LocalizerEnv:
 
         # Compute and normalize distance between centers
         dist_val = dist(self._bbox, self._target_bbox)
-        dist_val_norm = dist_val / self._max_dist
+        dist_val = dist_val / self._max_dist
 
-        iou_reward = self._alpha * iou_val
-        center_reward = self._beta * (1.0 - dist_val_norm)
+        iou_reward = self._alpha_1 * iou_val
 
-        # TODO - Maybe add rewards based on IoU and distance change
+        delta_iou_reward = 0.0
+        if self._prev_iou:
+            delta_iou_reward = self._alpha_2 * (iou_val - self._prev_iou)
 
-        return iou_reward + center_reward + self._step_penalty
+        delta_dist_reward = 0.0
+        if self._prev_dist:
+            delta_dist_reward = self._beta * (self._prev_dist - dist_val)
+
+        self._prev_iou = iou_val
+        self._prev_dist = dist_val
+
+        return iou_reward + delta_iou_reward + delta_dist_reward + self._step_penalty
 
     def _compute_final_reward(self) -> float:
         """

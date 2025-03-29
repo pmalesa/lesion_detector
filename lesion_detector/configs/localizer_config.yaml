@@ -16,10 +16,11 @@ environment:
   iou_threshold: 0.7
 
   reward:
-    alpha: 10.0                         # Weight of the IoU reward component
-    beta: 1.0                           # Weight of the center distance reward component 
-    step_penalty: -1.0
-    iou_final_reward: 50.0              # Additional, big reward on finishing step, when IoU >= threshold
+    alpha_1: 10.0                       # Weight of the IoU reward component
+    alpha_2: 100.0                      # Weight of the delta IoU reward component
+    beta: 20.0                          # Weight of the delta distance reward component 
+    step_penalty: -0.05
+    iou_final_reward: 20.0              # Additional, big reward on finishing step, when IoU >= threshold
 
 agent:
   learning_rate: 0.0001
