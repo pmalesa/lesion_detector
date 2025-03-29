@@ -23,7 +23,7 @@ class LocalizerAgent:
         self._epsilon_end = self._config.get("epsilon_end", 0.1)
         self._epsilon_decay = self._config.get("epsilon_decay", 10000)
         self._target_update_steps = self._config.get("target_update_steps", 100)
-        self._fixed_patch_length = self._config.get("fixed_patch_length", 128)
+        self._fixed_patch_length = self._config.get("fixed_patch_length", 64)
 
         # Initialize replay buffer and cache
         capacity = self._config.get("replay_buffer_size", 10000)

@@ -21,8 +21,10 @@ class DQN(Model):
         for layer in self._cnn.layers:
             layer.trainable = False
 
-        # Unfreeze the last trainale Conv layer at position -3
+        # Unfreeze the last block of the VGG16 network (3 last conv layers)
         self._cnn.layers[-3].trainable = True
+        self._cnn.layers[-4].trainable = True
+        self._cnn.layers[-5].trainable = True
         self._cnn_out_dim = 2048
 
         # # MLP component for previous actons

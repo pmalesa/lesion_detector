@@ -13,10 +13,10 @@ class LocalizerEnv:
         1: "MOVE_DOWN",
         2: "MOVE_LEFT",
         3: "MOVE_RIGHT",
-        4: "INCREASE_WIDTH",
-        5: "DECREASE_WIDTH",
-        6: "INCREASE_HEIGHT",
-        7: "DECREASE_HEIGHT",
+        4: "INCREASE_SIZE",
+        5: "DECREASE_SIZE",
+        6: "INCREASE_ASPECT_RATIO",
+        7: "DECREASE_ASPECT_RATIO",
         8: "FINISH",
     }
 
@@ -29,8 +29,9 @@ class LocalizerEnv:
         self._initial_bbox_width = self._config.get("initial_bbox_width", 50)
         self._initial_bbox_height = self._config.get("initial_bbox_height", 50)
         self._bbox_pixel_margin = self._config.get("bbox_pixel_margin", 10)
-        self._min_bbox_length = self._config.get("min_bbox_length", 10)
-        self._max_bbox_length = self._config.get("max_bbox_length", 128)
+        self._bbox_min_length = self._config.get("bbox_min_length", 10)
+        self._bbox_max_length = self._config.get("bbox_max_length", 64)
+        self._bbox_max_aspect_ratio = self._config.get("bbox_max_aspect_ratio", 3.0)
         self._move_step_factor = self._config.get("bbox_move_step_factor", 0.1)
         self._resize_factor = self._config.get("bbox_resize_factor", 0.1)
         self._iou_threshold = self._config.get("iou_threshold", 0.7)
@@ -99,14 +100,14 @@ class LocalizerEnv:
             case "MOVE_RIGHT":
                 move_step = self._calculate_move_step(self._bbox[2])
                 self._bbox[0] = min(self._image_width - 1, self._bbox[0] + move_step)
-            case "INCREASE_WIDTH":
-                self._increase_width()
-            case "DECREASE_WIDTH":
-                self._decrease_width()
-            case "INCREASE_HEIGHT":
-                self._increase_height()
-            case "DECREASE_HEIGHT":
-                self._decrease_height()
+            case "INCREASE_SIZE":
+                self._increase_size()
+            case "DECREASE_SIZE":
+                self._decrease_size()
+            case "INCREASE_ASPECT_RATIO":
+                self._increase_aspect_ratio()
+            case "DECREASE_ASPECT_RATIO":
+                self._decrease_aspect_ratio()
             case "FINISH":
                 done = True
                 info = {"bbox": self._bbox, "steps": self._current_step}
@@ -147,10 +148,10 @@ class LocalizerEnv:
             self._can_move_down(),
             self._can_move_left(),
             self._can_move_right(),
-            self._can_increase_width(),
-            self._can_decrease_width(),
-            self._can_increase_height(),
-            self._can_decrease_height(),
+            self._can_increase_size(),
+            self._can_decrease_size(),
+            self._can_increase_aspect_ratio(),
+            self._can_decrease_aspect_ratio(),
             True,
         ]
 
@@ -238,7 +239,7 @@ class LocalizerEnv:
         if iou_val >= self._iou_threshold:
             additional_reward += self._iou_final_reward
         else:
-            additional_reward -= (1.0 - iou_val) * self._iou_final_reward
+            additional_reward -= self._iou_final_reward
 
         # TODO - Maybe add additional big reward for distance
         # Or a negative reward for IoU below threshold
@@ -320,12 +321,40 @@ class LocalizerEnv:
 
         return max(1, round(0.5 * bbox_length * self._resize_factor))
 
+    def _increase_size(self):
+        w, h = self._bbox[2], self._bbox[3]
+        if w < self._bbox_max_length and h < self._bbox_max_length:
+            self._increase_width()
+            self._increase_height()
+
+    def _decrease_size(self):
+        w, h = self._bbox[2], self._bbox[3]
+        if w > self._bbox_min_length and h > self._bbox_min_length:
+            self._decrease_width()
+            self._decrease_height()
+
+    def _increase_aspect_ratio(self):
+        w, h = self._bbox[2], self._bbox[3]
+        if w / h < self._bbox_max_aspect_ratio:
+            if w < self._bbox_max_length:
+                self._increase_width()
+            elif h > self._bbox_min_length:
+                self._decrease_height()
+
+    def _decrease_aspect_ratio(self):
+        w, h = self._bbox[2], self._bbox[3]
+        if w / h > (1 / self._bbox_max_aspect_ratio):
+            if w > self._bbox_min_length:
+                self._decrease_width()
+            elif h < self._bbox_max_length:
+                self._increase_height()
+
     def _increase_width(self):
         x, w = self._bbox[0], self._bbox[2]
         step = self._calculate_resize_step(w)
 
         x_new = max(0, x - step)
-        w_new = min(self._max_bbox_length, w + 2 * step)
+        w_new = min(self._bbox_max_length, w + 2 * step)
 
         if x_new + w_new > self._image_width:
             w_new = self._image_width - x_new
@@ -338,7 +367,7 @@ class LocalizerEnv:
         step = self._calculate_resize_step(w)
 
         x_new = x + step
-        w_new = w - 2 * step
+        w_new = max(self._bbox_min_length, w - 2 * step)
 
         if x_new + w_new > self._image_width:
             w_new = self._image_width - x_new
@@ -351,9 +380,9 @@ class LocalizerEnv:
         step = self._calculate_resize_step(h)
 
         y_new = max(0, y - step)
-        h_new = min(self._max_bbox_length, h + 2 * step)
+        h_new = min(self._bbox_max_length, h + 2 * step)
 
-        if y_new + h_new > self._image_width:
+        if y_new + h_new > self._image_height:
             h_new = self._image_width - y_new
 
         self._bbox[1] = y_new
@@ -364,9 +393,9 @@ class LocalizerEnv:
         step = self._calculate_resize_step(h)
 
         y_new = y + step
-        h_new = h - 2 * step
+        h_new = max(self._bbox_min_length, h - 2 * step)
 
-        if y_new + h_new > self._image_width:
+        if y_new + h_new > self._image_height:
             h_new = self._image_width - y_new
 
         self._bbox[1] = y_new
@@ -384,14 +413,20 @@ class LocalizerEnv:
     def _can_move_right(self) -> bool:
         return self._bbox[0] + self._bbox[2] < self._image_width - 1
 
-    def _can_increase_width(self) -> bool:
-        return self._bbox[2] < self._max_bbox_length
+    def _can_increase_size(self) -> bool:
+        condition_1 = self._bbox[2] < self._bbox_max_length
+        condition_2 = self._bbox[3] < self._bbox_max_length
+        return condition_1 and condition_2
 
-    def _can_decrease_width(self) -> bool:
-        return self._bbox[2] > self._min_bbox_length
+    def _can_decrease_size(self) -> bool:
+        condition_1 = self._bbox[2] > self._bbox_min_length
+        condition_2 = self._bbox[3] > self._bbox_min_length
+        return condition_1 and condition_2
 
-    def _can_increase_height(self) -> bool:
-        return self._bbox[3] < self._max_bbox_length
+    def _can_increase_aspect_ratio(self) -> bool:
+        w, h = self._bbox[2], self._bbox[3]
+        return w / h < self._bbox_max_aspect_ratio
 
-    def _can_decrease_height(self) -> bool:
-        return self._bbox[3] > self._min_bbox_length
+    def _can_decrease_aspect_ratio(self) -> bool:
+        w, h = self._bbox[2], self._bbox[3]
+        return w / h > (1 / self._bbox_max_aspect_ratio)

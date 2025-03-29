@@ -9,8 +9,9 @@ environment:
   initial_bbox_width: 50
   initial_bbox_height: 50
   bbox_pixel_margin: 10                 # Number of margin pixels around the bounding box (in every direction)
-  min_bbox_length: 10                   # Minimal bounding box width/height
-  max_bbox_length: 128                  # Maximal bounding box width/height
+  bbox_min_length: 10                   # Minimal bounding box width/height
+  bbox_max_length: 64                   # Maximal bounding box width/height
+  bbox_max_aspect_ratio: 3.0            # Maximal aspect ratio of the bounding box
   n_previous_actions: 10                # Number of previous actions stored in the observation
   iou_threshold: 0.7
 
@@ -28,8 +29,8 @@ agent:
   epsilon_decay: 100
   replay_buffer_size: 10000
   target_update_steps: 10               # Number of steps after which the target network is updated
-  batch_size: 64 # 64
-  fixed_patch_length: 128               # Fixed length (widht/height) of the patch (input width/height of the CNN) 
+  batch_size: 32 # 64
+  fixed_patch_length: 64                # Fixed length (widht/height) of the patch (input width/height of the CNN) 
 
 train:
   train_episodes: 1000
