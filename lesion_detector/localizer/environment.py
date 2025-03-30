@@ -1,3 +1,5 @@
+import random
+
 import cv2
 import numpy as np
 import pandas as pd
@@ -32,6 +34,11 @@ class LocalizerEnv:
         self._bbox_min_length = self._config.get("bbox_min_length", 10)
         self._bbox_max_length = self._config.get("bbox_max_length", 64)
         self._bbox_max_aspect_ratio = self._config.get("bbox_max_aspect_ratio", 3.0)
+        self._bbox_randomize = self._config.get("bbox_randomize", True)
+        self._bbox_position_shift_range = self._config.get(
+            "bbox_position_shift_range", 50.0
+        )
+        self._bbox_size_shift_range = self._config.get("bbox_size_shift_range", 10.0)
         self._move_step_factor = self._config.get("bbox_move_step_factor", 0.1)
         self._resize_factor = self._config.get("bbox_resize_factor", 0.1)
         self._iou_threshold = self._config.get("iou_threshold", 0.7)
@@ -43,10 +50,10 @@ class LocalizerEnv:
         # Reward function weights
         self._config = self._config["reward"]
         self._alpha_1 = self._config.get("alpha_1", 5.0)
-        self._alpha_2 = self._config.get("alpha_2", 5.0)
-        self._beta = self._config.get("beta", 1.0)
+        self._alpha_2 = self._config.get("alpha_2", 2.0)
+        self._beta = self._config.get("beta", 2.0)
         self._step_penalty = self._config.get("step_penalty", -1.0)
-        self._iou_final_reward = self._config.get("iou_final_reward", 10.0)
+        self._iou_final_reward = self._config.get("iou_final_reward", 20.0)
         self._prev_dist = None
         self._prev_iou = None
 
@@ -228,13 +235,25 @@ class LocalizerEnv:
 
         iou_reward = self._alpha_1 * iou_val
 
-        delta_iou_reward = 0.0
-        if self._prev_iou:
-            delta_iou_reward = self._alpha_2 * (iou_val - self._prev_iou)
+        delta_iou_reward = (
+            0.0
+            if self._prev_iou is None
+            else (
+                self._alpha_2
+                if iou_val > self._prev_iou
+                else -self._alpha_2 if iou_val < self._prev_iou else 0.0
+            )
+        )
 
-        delta_dist_reward = 0.0
-        if self._prev_dist:
-            delta_dist_reward = self._beta * (self._prev_dist - dist_val)
+        delta_dist_reward = (
+            0.0
+            if self._prev_dist is None
+            else (
+                self._beta
+                if dist_val < self._prev_dist
+                else -self._beta if dist_val > self._prev_dist else 0.0
+            )
+        )
 
         self._prev_iou = iou_val
         self._prev_dist = dist_val
@@ -278,10 +297,33 @@ class LocalizerEnv:
         Resets current bounding box' parameters.
         """
 
-        w = self._initial_bbox_width
-        h = self._initial_bbox_height
-        x = int((self._image_width - w) / 2)
-        y = int((self._image_height - h) / 2)
+        random_size_shift = (
+            random.randint(-self._bbox_size_shift_range, self._bbox_size_shift_range)
+            if self._bbox_randomize
+            else 0
+        )
+
+        random_x_shift = (
+            random.randint(
+                -self._bbox_position_shift_range, self._bbox_position_shift_range
+            )
+            if self._bbox_randomize
+            else 0
+        )
+
+        random_y_shift = (
+            random.randint(
+                -self._bbox_position_shift_range, self._bbox_position_shift_range
+            )
+            if self._bbox_randomize
+            else 0
+        )
+
+        w = self._initial_bbox_width + random_size_shift
+        h = self._initial_bbox_height + random_size_shift
+
+        x = int((self._image_width - w) / 2) + random_x_shift
+        y = int((self._image_height - h) / 2) + random_y_shift
         self._bbox = np.array([x, y, w, h])
 
     def _check_done(self) -> bool:

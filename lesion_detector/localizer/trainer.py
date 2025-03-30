@@ -21,7 +21,7 @@ def train_localizer(config):
     num_episodes = config.get("train_episodes", 1000)
 
     # TODO - change so that it iterates over some/all training images
-    image_path = "../data/000001_03_01_088.png"
+    image_path = "../data/002715_01_01_290.png"
     image_name = extract_filename(image_path)
 
     for episode in range(num_episodes):
