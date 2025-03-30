@@ -235,25 +235,13 @@ class LocalizerEnv:
 
         iou_reward = self._alpha_1 * iou_val
 
-        delta_iou_reward = (
-            0.0
-            if self._prev_iou is None
-            else (
-                self._alpha_2
-                if iou_val > self._prev_iou
-                else -self._alpha_2 if iou_val < self._prev_iou else 0.0
-            )
-        )
+        delta_iou_reward = 0.0
+        if self._prev_iou:
+            delta_iou_reward = self._alpha_2 * (iou_val - self._prev_iou)
 
-        delta_dist_reward = (
-            0.0
-            if self._prev_dist is None
-            else (
-                self._beta
-                if dist_val < self._prev_dist
-                else -self._beta if dist_val > self._prev_dist else 0.0
-            )
-        )
+        delta_dist_reward = 0.0
+        if self._prev_dist:
+            delta_dist_reward = self._beta * (self._prev_dist - dist_val)
 
         self._prev_iou = iou_val
         self._prev_dist = dist_val
@@ -271,12 +259,8 @@ class LocalizerEnv:
         additional_reward = 0.0
         if iou_val >= self._iou_threshold:
             additional_reward += self._iou_final_reward
-        else:
+        elif iou_val < self._iou_threshold - 0.2:
             additional_reward -= self._iou_final_reward
-
-        # TODO - Maybe add additional big reward for distance
-        # Or a negative reward for IoU below threshold
-        # ...
 
         return self._compute_reward() + additional_reward
 

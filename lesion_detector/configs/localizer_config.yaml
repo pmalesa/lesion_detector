@@ -13,17 +13,17 @@ environment:
   bbox_max_length: 64                   # Maximal bounding box width/height
   bbox_max_aspect_ratio: 3.0            # Maximal aspect ratio of the bounding box
   bbox_randomize: true
-  bbox_position_shift_range: 50
-  bbox_size_shift_range: 10
+  bbox_position_shift_range: 50         # Value by which x or y coordinate of the bounding box can vary in both directions when initialized
+  bbox_size_shift_range: 10             # Value by which width and height of the bounding box can vary when initialized
   n_previous_actions: 10                # Number of previous actions stored in the observation
   iou_threshold: 0.7
 
   reward:
-    alpha_1: 10.0                       # Weight of the IoU reward component
-    alpha_2: 2.0                        # Weight of the delta IoU reward component
-    beta: 2.0                           # Weight of the delta distance reward component 
-    step_penalty: -1.0
-    iou_final_reward: 20.0              # Additional, big reward on finishing step, when IoU >= threshold
+    alpha_1: 5.0                        # Weight of the IoU reward component
+    alpha_2: 2.0                        # Weight of the delta IoU reward component (2.0 - 3.0)
+    beta: 5.0                           # Weight of the delta distance reward component  (5.0 - 10.0)
+    step_penalty: -0.05                 # (-0.05 - -0.02)
+    iou_final_reward: 25.0              # Additional, big reward on finishing step, when IoU >= threshold (20.0 - 30.0)
 
 agent:
   learning_rate: 0.0001
