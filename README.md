@@ -31,6 +31,12 @@ conda remove --name lesion_detector_env --all
 python main.py --task train_localizer
 ```
 
+## Plot results
+To plot the obtained results from a training or evaluation run use the plot_results.py script located in the scripts/ folder in the root directory.
+```bash
+python plot_results.py --csv_file <csv_file_path>
+```
+
 ## Pre-commit Hooks Configuration
 ### Install Pre-commit Hooks
 ```bash

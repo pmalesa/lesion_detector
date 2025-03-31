@@ -7,6 +7,7 @@ from keras.optimizers import Adam
 from localizer.networks.dqn import DQN
 from localizer.utils.replay_buffer import ReplayBuffer
 from numpy.typing import NDArray
+from tensorflow.keras.models import load_model
 
 logger = logging.getLogger("LESION-DETECTOR")
 
@@ -37,6 +38,15 @@ class LocalizerAgent:
         self._q_network = DQN(action_dim=9, image_shape=image_shape)
         self._target_network = DQN(action_dim=9, image_shape=image_shape)
         self._optimizer = Adam(learning_rate=self._learning_rate)
+
+    def reset(self):
+        """
+        Resets the agent's epsilon value and clears the replay buffer.
+        """
+
+        self._global_step = 0
+        self._epsilon = self._epsilon_start
+        self._replay_buffer.clear()
 
     def select_action(self, obs: NDArray[np.float32], mask: np.ndarray):
         # Epsilon-greedy policy
@@ -110,10 +120,14 @@ class LocalizerAgent:
             target_q = rewards + (1 - dones) * self._gamma * q_next_max
 
             # Calculate MSE between the Q-value of the action taken and target Q-value
-            loss = tf.reduce_mean((chosen_q - target_q) ** 2)
+            # loss = tf.reduce_mean((chosen_q - target_q) ** 2)
 
-        # Backprop and update the network
+            # Calculate the Huber loss between the Q-value of the action taken and target Q-value
+            loss = tf.reduce_mean(tf.keras.losses.huber(chosen_q, target_q))
+
+        # Backprop, clip gradients and update the network
         grads = tape.gradient(loss, self._q_network.trainable_variables)
+        grads = [tf.clip_by_norm(g, 1.0) for g in grads]
         self._optimizer.apply_gradients(zip(grads, self._q_network.trainable_variables))
 
         self._global_step += 1
@@ -128,7 +142,17 @@ class LocalizerAgent:
             self._epsilon_end - self._epsilon_start
         )
 
+        if self._global_step % 100 == 0 and self._epsilon >= self._epsilon_end:
+            logger.info(f"* EPSILON: {round(self._epsilon, 2)} *")
+
         return loss
+
+    def save_model(self, path: str):
+        self._q_network.save(path)
+
+    def load_model(self, path: str):
+        self._q_network = load_model(path)
+        self._target_network.set_weights(self._q_network.get_weights())
 
     def _prepare_batch(self, observations: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """

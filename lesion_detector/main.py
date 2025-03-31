@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from common.file_utils import load_config
-from localizer.trainer import test_localizer, train_localizer
+from localizer.trainer import evaluate_localizer, train_localizer
 
 
 def main():
@@ -52,7 +52,7 @@ def main():
     if args.task == "train_localizer":
         train_localizer(config)
     elif args.task == "test_localizer":
-        test_localizer(config)
+        evaluate_localizer(config)
     elif args.task == "train_classifier":
         pass
     elif args.task == "test_classifier":

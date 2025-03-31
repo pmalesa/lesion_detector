@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 from common.file_utils import extract_filename, load_metadata
+from common.logging_utils import append_log, create_run_dir, init_log, save_config
 from localizer.agent import LocalizerAgent
 from localizer.environment import LocalizerEnv
 from tensorflow.config import list_physical_devices
@@ -17,12 +18,18 @@ def train_localizer(config):
     dataset_metadata = load_metadata(metadata_path)
     env = LocalizerEnv(config)
     agent = LocalizerAgent(config)
-    config = config["train"]
-    num_episodes = config.get("train_episodes", 1000)
+    log_interval = config["train"]["log_interval"]
+    num_episodes = config["train"]["train_episodes"]
+
+    # Initialize run's logs
+    run_dir = create_run_dir(config)
+    csv_log_path = run_dir / "training_log.csv"
+    init_log(csv_log_path)
 
     # TODO - change so that it iterates over some/all training images
     image_path = "../data/000001_03_01_088.png"
     image_name = extract_filename(image_path)
+    # agent.reset() # TODO <- Do this after switching to a new image!!!
 
     for episode in range(num_episodes):
         image_metadata = dataset_metadata.loc[
@@ -46,20 +53,34 @@ def train_localizer(config):
             if loss:
                 losses.append(float(loss))
             obs = next_obs
-        mean_loss = round(np.mean(losses), 2)
-        logger.info(
-            f"Episode {episode + 1} - Mean Loss: {mean_loss} | Reward: {round(episode_reward, 2)}"
+
+        mean_loss = round(np.mean(losses), 2) if losses else None
+        episode_reward = round(episode_reward, 2)
+        append_log(
+            csv_log_path, episode, info["iou"], info["dist"], mean_loss, episode_reward
         )
 
+        if episode % log_interval == 0:
+            logger.info(
+                f"Episode {episode + 1} | "
+                f"Mean Loss: {mean_loss} | "
+                f"Reward: {episode_reward}"
+            )
+
+    # Save run's results
+    save_config(run_dir, config)
+    agent.save_model(str(run_dir / "model.keras"))
     logger.info("Localizer training finished.")
 
 
-def test_localizer(config):
+# TODO
+def evaluate_localizer(config):
     logger = logging.getLogger("LESION-DETECTOR")
     logger.info("Starting localizer testing.")
 
     env = LocalizerEnv(config)
     agent = LocalizerAgent(config)
+    # agent.load_model(...)
     config = config["test"]
 
     num_episodes = config.get("test_episodes", 10)

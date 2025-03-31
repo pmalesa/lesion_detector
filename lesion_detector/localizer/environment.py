@@ -122,7 +122,13 @@ class LocalizerEnv:
                 self._decrease_aspect_ratio()
             case "FINISH":
                 done = True
-                info = {"bbox": self._bbox, "steps": self._current_step}
+                iou_val, dist_val = self._get_iou_and_distance()
+                info = {
+                    "bbox": self._bbox,
+                    "steps": self._current_step,
+                    "iou": round(iou_val, 4),
+                    "dist": round(dist_val, 4),
+                }
 
                 # if self._render:
                 #     cv2.destroyAllWindows()
@@ -137,7 +143,17 @@ class LocalizerEnv:
         next_obs = self._get_observation()
         reward = self._compute_reward()
         done = self._check_done()
-        info = {} if not done else {"bbox": self._bbox, "steps": self._current_step}
+        iou_val, dist_val = self._get_iou_and_distance()
+        info = (
+            {}
+            if not done
+            else {
+                "bbox": self._bbox,
+                "steps": self._current_step,
+                "iou": round(iou_val, 4),
+                "dist": round(dist_val, 4),
+            }
+        )
         self._current_step += 1
 
         if self._render:
@@ -227,11 +243,7 @@ class LocalizerEnv:
         * Step penalty component.
         """
 
-        iou_val = iou(self._bbox, self._target_bbox)
-
-        # Compute and normalize distance between centers
-        dist_val = dist(self._bbox, self._target_bbox)
-        dist_val = dist_val / self._max_dist
+        iou_val, dist_val = self._get_iou_and_distance()
 
         iou_reward = self._alpha_1 * iou_val
 
@@ -263,6 +275,18 @@ class LocalizerEnv:
             additional_reward -= self._iou_final_reward
 
         return self._compute_reward() + additional_reward
+
+    def _get_iou_and_distance(self) -> tuple[float, float]:
+        """
+        Computes the iou and normalized distance metrics and
+        returns them as a tuple.
+        """
+
+        iou_val = iou(self._bbox, self._target_bbox)
+        dist_val = dist(self._bbox, self._target_bbox)
+        dist_val = dist_val / self._max_dist
+
+        return (iou_val, dist_val)
 
     def _init_image_data(self, image_path: str, image_metadata: pd.DataFrame):
         """
@@ -314,8 +338,10 @@ class LocalizerEnv:
         """
         Checks whether the episode should end.
         """
+        condition_1 = self._current_step >= self._max_steps
+        condition_2 = self._prev_iou and self._prev_iou >= 0.8
 
-        return self._current_step >= self._max_steps
+        return condition_1 or condition_2
 
     def _init_target_bbox(self):
         """

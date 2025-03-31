@@ -36,5 +36,12 @@ class ReplayBuffer:
             np.array(dones, dtype=np.int32),
         )
 
+    def clear(self):
+        """
+        Clears the replay buffer.
+        """
+
+        self._buffer.clear()
+
     def __len__(self):
         return len(self._buffer)
