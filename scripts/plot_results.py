@@ -37,7 +37,7 @@ def plot_metrics(csv_file: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plot training metrics from CSV file")
     parser.add_argument(
-        "--csv_file", type=str, required=True, help="Path to training log CSV file"
+        "--csv-file", type=str, required=True, help="Path to training log CSV file"
     )
     args = parser.parse_args()
     if os.path.exists(args.csv_file):

@@ -142,7 +142,7 @@ class LocalizerAgent:
             self._epsilon_end - self._epsilon_start
         )
 
-        if self._global_step % 100 == 0 and self._epsilon >= self._epsilon_end:
+        if self._global_step % 100 == 0 and self._global_step <= self._epsilon_decay:
             logger.info(f"* EPSILON: {round(self._epsilon, 2)} *")
 
         return loss

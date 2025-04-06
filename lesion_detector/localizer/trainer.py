@@ -54,7 +54,7 @@ def train_localizer(config):
                 losses.append(float(loss))
             obs = next_obs
 
-        mean_loss = round(np.mean(losses), 2) if losses else None
+        mean_loss = round(np.mean(losses), 2) if losses else 0.0
         episode_reward = round(episode_reward, 2)
         append_log(
             csv_log_path, episode, info["iou"], info["dist"], mean_loss, episode_reward
@@ -64,7 +64,8 @@ def train_localizer(config):
             logger.info(
                 f"Episode {episode + 1} | "
                 f"Mean Loss: {mean_loss} | "
-                f"Reward: {episode_reward}"
+                f"Reward: {episode_reward} | "
+                f"Steps: {info['steps']}"
             )
 
     # Save run's results
@@ -75,7 +76,6 @@ def train_localizer(config):
 
 # TODO
 def evaluate_localizer(config):
-    logger = logging.getLogger("LESION-DETECTOR")
     logger.info("Starting localizer testing.")
 
     env = LocalizerEnv(config)

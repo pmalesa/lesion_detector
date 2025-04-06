@@ -54,6 +54,7 @@ class LocalizerEnv:
         self._beta = self._config.get("beta", 2.0)
         self._step_penalty = self._config.get("step_penalty", -1.0)
         self._iou_final_reward = self._config.get("iou_final_reward", 20.0)
+
         self._prev_dist = None
         self._prev_iou = None
 
@@ -121,13 +122,11 @@ class LocalizerEnv:
             case "DECREASE_ASPECT_RATIO":
                 self._decrease_aspect_ratio()
             case "FINISH":
-                done = True
-                iou_val, dist_val = self._get_iou_and_distance()
                 info = {
                     "bbox": self._bbox,
                     "steps": self._current_step,
-                    "iou": round(iou_val, 4),
-                    "dist": round(dist_val, 4),
+                    "iou": round(self._get_iou(), 4),
+                    "dist": round(self._get_distance(), 4),
                 }
 
                 # if self._render:
@@ -136,22 +135,25 @@ class LocalizerEnv:
                 return (
                     self._get_observation(),
                     self._compute_final_reward(),
-                    done,
+                    True,
                     info,
                 )
 
         next_obs = self._get_observation()
-        reward = self._compute_reward()
         done = self._check_done()
-        iou_val, dist_val = self._get_iou_and_distance()
+        reward = None
+        if done:
+            reward = self._compute_timeout_reward()
+        else:
+            reward = self._compute_reward()
         info = (
             {}
             if not done
             else {
                 "bbox": self._bbox,
                 "steps": self._current_step,
-                "iou": round(iou_val, 4),
-                "dist": round(dist_val, 4),
+                "iou": round(self._get_iou(), 4),
+                "dist": round(self._get_distance(), 4),
             }
         )
         self._current_step += 1
@@ -243,7 +245,7 @@ class LocalizerEnv:
         * Step penalty component.
         """
 
-        iou_val, dist_val = self._get_iou_and_distance()
+        iou_val, dist_val = self._get_iou(), self._get_distance()
 
         iou_reward = self._alpha_1 * iou_val
 
@@ -266,7 +268,7 @@ class LocalizerEnv:
         which ends an episode.
         """
 
-        iou_val = iou(self._bbox, self._target_bbox)
+        iou_val = self._get_iou()
 
         additional_reward = 0.0
         if iou_val >= self._iou_threshold:
@@ -276,17 +278,36 @@ class LocalizerEnv:
 
         return self._compute_reward() + additional_reward
 
-    def _get_iou_and_distance(self) -> tuple[float, float]:
+    def _compute_timeout_reward(self) -> float:
         """
-        Computes the iou and normalized distance metrics and
-        returns them as a tuple.
+        Computes the reward after reaching the maximal
+        number of steps without taking the FINAL action.
         """
 
-        iou_val = iou(self._bbox, self._target_bbox)
+        iou_val = self._get_iou()
+
+        additional_reward = 0.0
+        if iou_val >= self._iou_threshold:
+            additional_reward += self._iou_final_reward
+        elif iou_val < self._iou_threshold - 0.2:
+            additional_reward -= self._iou_final_reward
+
+        return self._compute_reward() + 0.5 * additional_reward
+
+    def _get_iou(self) -> float:
+        """
+        Computes and returns the current IoU metric value.
+        """
+
+        return iou(self._bbox, self._target_bbox)
+
+    def _get_distance(self) -> float:
+        """
+        Computes and returns the current normalized distance metric value.
+        """
+
         dist_val = dist(self._bbox, self._target_bbox)
-        dist_val = dist_val / self._max_dist
-
-        return (iou_val, dist_val)
+        return dist_val / self._max_dist
 
     def _init_image_data(self, image_path: str, image_metadata: pd.DataFrame):
         """
@@ -339,7 +360,7 @@ class LocalizerEnv:
         Checks whether the episode should end.
         """
         condition_1 = self._current_step >= self._max_steps
-        condition_2 = self._prev_iou and self._prev_iou >= 0.8
+        condition_2 = self._get_iou() >= 0.8
 
         return condition_1 or condition_2
 

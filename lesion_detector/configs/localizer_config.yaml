@@ -19,21 +19,21 @@ environment:
   iou_threshold: 0.7
 
   reward:
-    alpha_1: 5.0                        # Weight of the IoU reward component
-    alpha_2: 2.0                        # Weight of the delta IoU reward component (2.0 - 3.0)
+    alpha_1: 1.0                        # Weight of the IoU reward component
+    alpha_2: 3.0                        # Weight of the delta IoU reward component (2.0 - 3.0)
     beta: 5.0                           # Weight of the delta distance reward component  (5.0 - 10.0)
-    step_penalty: -0.05                 # (-0.05 - -0.02)
-    iou_final_reward: 25.0              # Additional, big reward on finishing step, when IoU >= threshold (20.0 - 30.0)
+    step_penalty: -0.1                  # (-0.05 - -0.02)
+    iou_final_reward: 50.0              # Additional, big reward on finishing step, when IoU >= threshold (20.0 - 30.0)
 
 agent:
   learning_rate: 0.0001
   gamma: 0.99                           # discount factor
   epsilon_start: 1.0
-  epsilon_end: 0.1
-  epsilon_decay: 3000                   # Number of global steps (not episodes!) after which the epsilon will reach its minimum value
+  epsilon_end: 0.01
+  epsilon_decay: 1500                   # Number of global steps (not episodes!) after which the epsilon will reach its minimum value
   replay_buffer_size: 10000
-  target_update_steps: 100              # Number of steps after which the target network is updated
-  batch_size: 32 # 64
+  target_update_steps: 500              # Number of steps after which the target network is updated
+  batch_size: 64 # 64
   fixed_patch_length: 64                # Fixed length (widht/height) of the patch (input width/height of the CNN) 
 
 train:
