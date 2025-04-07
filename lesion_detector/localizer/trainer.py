@@ -25,6 +25,7 @@ def train_localizer(config):
     run_dir = create_run_dir(config)
     csv_log_path = run_dir / "training_log.csv"
     init_log(csv_log_path)
+    save_config(run_dir, config) 
 
     # TODO - change so that it iterates over some/all training images
     image_path = "../data/000001_03_01_088.png"
@@ -69,7 +70,6 @@ def train_localizer(config):
             )
 
     # Save run's results
-    save_config(run_dir, config)
     agent.save_model(str(run_dir / "model.keras"))
     logger.info("Localizer training finished.")
 
