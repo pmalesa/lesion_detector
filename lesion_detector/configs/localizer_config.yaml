@@ -6,8 +6,8 @@ environment:
   max_steps: 100                        # Max steps the agent can take before the episode ends
   bbox_move_step_factor: 0.1
   bbox_resize_factor: 0.1
-  initial_bbox_width: 192
-  initial_bbox_height: 192
+  initial_bbox_width: 320
+  initial_bbox_height: 320
   bbox_pixel_margin: 10                 # Number of margin pixels around the bounding box (in every direction)
   bbox_min_length: 10                   # Minimal bounding box width/height
   bbox_max_length: 64                   # Maximal bounding box width/height
