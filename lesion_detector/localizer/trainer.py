@@ -1,6 +1,7 @@
 import logging
 
 import numpy as np
+import pandas as pd
 from common.file_utils import extract_filename, load_metadata
 from common.logging_utils import append_log, create_run_dir, init_log, save_config
 from localizer.agent import LocalizerAgent
@@ -9,13 +10,13 @@ from tensorflow.config import list_physical_devices
 
 logger = logging.getLogger("LESION-DETECTOR")
 
-
 def train_localizer(config):
     show_available_devices()
     logger.info("Starting localizer training.")
 
     metadata_path = config.get("metadata_path", "")
     dataset_metadata = load_metadata(metadata_path)
+
     env = LocalizerEnv(config)
     agent = LocalizerAgent(config)
     log_interval = config["train"]["log_interval"]
@@ -27,80 +28,128 @@ def train_localizer(config):
     init_log(csv_log_path)
     save_config(run_dir, config) 
 
-    # TODO - change so that it iterates over some/all training images
-    image_path = "../data/000001_03_01_088.png"
-    image_name = extract_filename(image_path)
-    # agent.reset() # TODO <- Do this after switching to a new image!!!
+    # Iterate over all training key slice images
+    image_names = get_image_names("train", dataset_metadata)
+    for i, image_name in enumerate(image_names):
+        image_name = image_names[1666] # TODO
+        logger.info(f"Loaded image {i + 1}: {image_name}.")
+        image_path = f"../data/deeplesion/key_slices/{image_name}"
+        agent.reset()
+        
+        for episode in range(num_episodes):
+            image_metadata = get_image_metadata(dataset_metadata, image_name)
+            obs = env.reset(image_path, image_metadata)
 
-    for episode in range(num_episodes):
-        image_metadata = dataset_metadata.loc[
-            dataset_metadata["File_name"] == image_name
-        ].iloc[0]
+            episode_reward = 0.0
+            losses = []
+            done = False
+            info = {}
 
-        obs = env.reset(image_path, image_metadata)
+            while not done:
+                mask = env.get_available_actions()
+                action = agent.select_action(obs, mask)
+                next_obs, reward, done, info = env.step(action)
+                agent.store_experience((obs, action, reward, next_obs, done))
+                loss = agent.update()
+                episode_reward += reward
+                if loss:
+                    losses.append(float(loss))
+                obs = next_obs
 
-        episode_reward = 0.0
-        losses = []
-        done = False
-        info = {}
-
-        while not done:
-            mask = env.get_available_actions()
-            action = agent.select_action(obs, mask)
-            next_obs, reward, done, info = env.step(action)
-            agent.store_experience((obs, action, reward, next_obs, done))
-            loss = agent.update()
-            episode_reward += reward
-            if loss:
-                losses.append(float(loss))
-            obs = next_obs
-
-        mean_loss = round(np.mean(losses), 2) if losses else 0.0
-        episode_reward = round(episode_reward, 2)
-        append_log(
-            csv_log_path, episode, info["iou"], info["dist"], mean_loss, episode_reward
-        )
-
-        if episode % log_interval == 0:
-            logger.info(
-                f"Episode {episode + 1} | "
-                f"Mean Loss: {mean_loss} | "
-                f"Reward: {episode_reward} | "
-                f"Steps: {info['steps']}"
+            mean_loss = round(np.mean(losses), 2) if losses else 0.0
+            episode_reward = round(episode_reward, 2)
+            append_log(
+                csv_log_path, episode, info["iou"], info["dist"], mean_loss, episode_reward
             )
+
+            if episode % log_interval == 0:
+                logger.info(
+                    f"Episode {episode + 1} | "
+                    f"Mean Loss: {mean_loss} | "
+                    f"Reward: {episode_reward} | "
+                    f"Steps: {info['steps']}"
+                )
+
+        break # TODO
 
     # Save run's results
     agent.save_model(str(run_dir / "model.keras"))
     logger.info("Localizer training finished.")
 
-
-# TODO
-def evaluate_localizer(config):
+def evaluate_localizer(config, model_weights_path: str):
     logger.info("Starting localizer testing.")
+
+    metadata_path = config.get("metadata_path", "")
+    dataset_metadata = load_metadata(metadata_path)
 
     env = LocalizerEnv(config)
     agent = LocalizerAgent(config)
-    # agent.load_model(...)
+    agent.load_model(model_weights_path)
     config = config["test"]
 
-    num_episodes = config.get("test_episodes", 10)
-    for episode in range(num_episodes):
-        obs = env.reset()
-        done = False
-        episode_reward = 0.0
-        while not done:
-            action = agent.select_action(obs)
-            next_obs, reward, done, info = env.step(action)
-            episode_reward += reward
-            obs = next_obs
-        logger.info(f"Test Episode {episode} - Reward: {episode_reward}")
+    # Iterate over all test key slice images
+    image_names = get_image_names("test", dataset_metadata)
+    for i, image_name in enumerate(image_names):
+        logger.info(f"Loaded image {i + 1}: {image_name}.")
+        image_path = f"../data/deeplesion/key_slices/{image_name}"
+        image_metadata = get_image_metadata(dataset_metadata, image_name)
 
-    logger.info("Localizer testing finished.")
+        obs = env.reset(image_path, image_metadata)
+        done = False
+        while not done:
+            mask = env.get_available_actions()
+            action = agent.select_action(obs, mask, training=False)
+            next_obs, reward, done, info = env.step(action)
+            obs = next_obs
+
+        logger.info(f"Image {image_name} - Final IoU: {info['iou']} - Total steps: {info['steps']}")
+
+    logger.info("Localizer evaluation finished.")
 
 
 def show_available_devices():
+    """
+    Prints the list of available devices.
+    """
+    
     message = f"\n  Number of GPUs available: {len(list_physical_devices('GPU'))}"
     message += "\n  Available devices:"
     for device in list_physical_devices():
         message += f"\n   - {device}"
     logger.info(message)
+
+def get_image_names(split_type_str: str, metadata: pd.DataFrame):
+    """
+    Returns a list of key slices' image names, given the split
+    type (train, validation or test).
+    """
+
+    split_type = None
+    match split_type_str:
+        case "train":
+            split_type = 1
+        case "validation":
+            split_type = 2
+        case "test":
+            split_type = 3
+        case _:
+            logger.error(f"Wrong image type selected. "
+                "Must be \"train\", \"validation\" or \"test\".")
+            
+    image_names = []
+    for i in range(len(metadata)):
+        if metadata["Train_Val_Test"][i] == split_type:
+            image_names.append(metadata["File_name"][i])
+
+    return image_names
+
+# TODO - there can be multiple rows with the same image name (fix it)! 
+def get_image_metadata(metadata: pd.DataFrame, image_name: str):
+    """
+    Returns the dataframe of a single row from the whole 
+    metadata dataframe, given the image name.
+    """
+
+    return metadata.loc[
+        metadata["File_name"] == image_name
+    ].iloc[0]

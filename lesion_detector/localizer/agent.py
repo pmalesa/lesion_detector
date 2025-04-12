@@ -46,23 +46,22 @@ class LocalizerAgent:
 
         self._global_step = 0
         self._epsilon = self._epsilon_start
-        self._replay_buffer.clear()
 
-    def select_action(self, obs: NDArray[np.float32], mask: np.ndarray):
-        # Epsilon-greedy policy
-        if np.random.rand() < self._epsilon:
+    def select_action(self, obs: NDArray[np.float32], mask: np.ndarray, training: bool = True):
+        # Epsilon-greedy policy (only during training)
+        if training and np.random.rand() < self._epsilon:
             allowed_actions = np.where(mask == 1)[0]
             action = np.random.choice(allowed_actions)
         else:
             (img_patch, prev_actions) = obs
 
-            # Resize patch to a fixed size (128, 128)
+            # Resize patch to a fixed size (64, 64)
             resized_patch = self._resize_patch(img_patch)
 
-            # Replicate patch across three channels (128, 128, 3)
+            # Replicate patch across three channels (64, 64, 3)
             patch_data = np.repeat(resized_patch[..., np.newaxis], 3, axis=-1)
 
-            # Convert into (1, 128, 128, 3), by adding batch dimension
+            # Convert into (1, 64, 64, 3), by adding batch dimension
             patch_input = np.expand_dims(patch_data, axis=0)
 
             # Convert into (1, 90), by adding batch dimension

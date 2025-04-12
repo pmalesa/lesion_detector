@@ -16,24 +16,35 @@ def main():
         required=True,
         choices=[
             "train_localizer",
-            "test_localizer",
+            "eval_localizer",
             "train_classifier",
             "test_classifier",
         ],
         help="Specify which task to run/",
     )
+    parser.add_argument(
+        "--run_dir",
+        type=str,
+        required=False,
+        help="Path to the trained model directory (required for evaluation)"
+    )
     args = parser.parse_args()
+
+    if args.task == "eval_localizer" and not args.run_dir:
+        parser.error("--run-dir is required when --task=eval_localizer")
 
     # Load configuration
     config_path = ""
-    if "localizer" in args.task:
-        config_path = "configs/localizer_config.yaml"
+    if args.task == "train_localizer":
+        config_path = Path("configs/localizer_config.yaml")
+        if not config_path.exists():
+            print(f"Config file not found: {config_path}")
+            sys.exit(1)
     else:
-        config_path = "configs/classifier_config.yaml"
-    config_path = Path(config_path)
-    if not config_path.exists():
-        print(f"Config file not found: {config_path}")
-        sys.exit(1)
+        config_path = Path(f"{args.run_dir}/config.yaml")
+        if not config_path.exists():
+            print(f"Config file not found: {config_path}")
+            sys.exit(1)
     config = load_config(config_path)
 
     # Set up logging
@@ -51,8 +62,9 @@ def main():
     logger.info(f"Starting the task: {args.task}")
     if args.task == "train_localizer":
         train_localizer(config)
-    elif args.task == "test_localizer":
-        evaluate_localizer(config)
+    elif args.task == "eval_localizer":
+        model_weights_path = f"{args.run_dir}/model.keras"
+        evaluate_localizer(config, model_weights_path)
     elif args.task == "train_classifier":
         pass
     elif args.task == "test_classifier":
@@ -62,7 +74,6 @@ def main():
         sys.exit(1)
 
     logger.info("Task completed successfully.")
-
 
 if __name__ == "__main__":
     main()

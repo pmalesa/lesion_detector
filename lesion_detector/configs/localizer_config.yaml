@@ -37,7 +37,7 @@ agent:
   fixed_patch_length: 64                # Fixed length (widht/height) of the patch (input width/height of the CNN) 
 
 train:
-  train_episodes: 500
+  train_episodes: 10
   log_interval: 1                       # print/log progress every x episodes
   save_interval: 50                     # chackpoint model every x episodes
   output_dir: "../runs/localizer"       # path for saving logs, checkpoints etc.
