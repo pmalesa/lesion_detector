@@ -1,8 +1,9 @@
 import os
-import pandas as pd
+import shutil
 import urllib.request
 import zipfile
-import shutil
+
+import pandas as pd
 
 # URLs for the zip files
 urls = [
@@ -61,8 +62,9 @@ urls = [
     "https://nihcc.box.com/shared/static/7x4pvrdu0lhazj83sdee7nr0zj0s1t0v.zip",
     "https://nihcc.box.com/shared/static/z7s2zzdtxe696rlo16cqf5pxahpl8dup.zip",
     "https://nihcc.box.com/shared/static/shr998yp51gf2y5jj7jqxz2ht8lcbril.zip",
-    "https://nihcc.box.com/shared/static/kqg4peb9j53ljhrxe3l3zrj4ac6xogif.zip"
+    "https://nihcc.box.com/shared/static/kqg4peb9j53ljhrxe3l3zrj4ac6xogif.zip",
 ]
+
 
 def download_file(url: str, download_path: str, file_name: str):
     """
@@ -78,6 +80,7 @@ def download_file(url: str, download_path: str, file_name: str):
                     break
                 out_file.write(chunk)
 
+
 def extract_key_slices(file_path: str, extract_path: str, key_slice_names: set[str]):
     """
     Extracts key slice images from the given zip file to the
@@ -87,7 +90,7 @@ def extract_key_slices(file_path: str, extract_path: str, key_slice_names: set[s
     with zipfile.ZipFile(file_path, "r") as zip_file:
         for member in zip_file.namelist():
             if member.startswith("Images_png/") and not member.endswith("/"):
-                relative_path = member[len("Images_png/"):]
+                relative_path = member[len("Images_png/") :]
                 parts = relative_path.split("/")
 
                 if len(parts) != 2:
@@ -104,10 +107,11 @@ def extract_key_slices(file_path: str, extract_path: str, key_slice_names: set[s
                 with zip_file.open(member) as source, open(target_path, "wb") as target:
                     shutil.copyfileobj(source, target)
 
-def get_key_slice_names() -> set[str]:    
+
+def get_key_slice_names() -> set[str]:
     """
     Reads the DeepLesion metadata files and returns
-    the set of all image names. 
+    the set of all image names.
     """
 
     path = "../data/deeplesion_metadata.csv"
@@ -120,6 +124,7 @@ def get_key_slice_names() -> set[str]:
 
     return image_names
 
+
 def check_key_slices(path: str, key_slice_names: set[str]) -> bool:
     """
     Checks whether all key slices are present
@@ -127,7 +132,7 @@ def check_key_slices(path: str, key_slice_names: set[str]) -> bool:
     """
 
     extracted_key_slices = set()
-    image_extensions = (".png")
+    image_extensions = ".png"
 
     for file_name in os.listdir(path):
         if file_name.lower().endswith(image_extensions):
@@ -139,6 +144,7 @@ def check_key_slices(path: str, key_slice_names: set[str]) -> bool:
             return False
 
     return len(key_slice_names) == len(extracted_key_slices)
+
 
 def download_images():
     """
@@ -156,15 +162,16 @@ def download_images():
         zip_path = os.path.join(download_path, file_name)
         print(f"Downloading {file_name} ...")
         download_file(url, download_path, file_name)
-        print(f"Download successful.")
-        print(f"Extracting images to temporary directory ...")
+        print("Download successful.")
+        print("Extracting images to temporary directory ...")
         extract_key_slices(zip_path, target_path, key_slice_names)
-        print(f"All images extracted.")
+        print("All images extracted.")
         os.remove(zip_path)
 
     if not check_key_slices(target_path, key_slice_names):
         print("WARNING! Not all key slice images were extracted!")
     print("All key slices were downloaded successfully!")
+
 
 if __name__ == "__main__":
     download_images()

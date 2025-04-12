@@ -26,7 +26,7 @@ def main():
         "--run_dir",
         type=str,
         required=False,
-        help="Path to the trained model directory (required for evaluation)"
+        help="Path to the trained model directory (required for evaluation)",
     )
     args = parser.parse_args()
 
@@ -74,6 +74,7 @@ def main():
         sys.exit(1)
 
     logger.info("Task completed successfully.")
+
 
 if __name__ == "__main__":
     main()

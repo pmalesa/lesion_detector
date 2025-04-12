@@ -11,7 +11,9 @@ repos:
     rev: 7.1.1
     hooks:
       - id: flake8
-        args: ["--max-line-length=100"]
+        args: 
+          - --max-line-length=100
+          - --ignore=E203
 
   # Import sorting
   - repo: https://github.com/PyCQA/isort

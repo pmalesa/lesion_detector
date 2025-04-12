@@ -31,6 +31,11 @@ conda remove --name lesion_detector_env --all
 python main.py --task train_localizer
 ```
 
+## Run evaluation
+```bash
+python main.py --task eval_localizer --run_dir=<run_path>
+```
+
 ## Plot results
 To plot the obtained results from a training or evaluation run use the plot_results.py script located in the scripts/ folder in the root directory.
 ```bash

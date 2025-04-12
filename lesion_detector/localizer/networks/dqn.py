@@ -1,7 +1,8 @@
 import tensorflow as tf
-from tensorflow.keras.utils import register_keras_serializable
 from keras import Model, layers
 from keras.applications.vgg16 import VGG16
+from tensorflow.keras.utils import register_keras_serializable
+
 
 @register_keras_serializable(package="localizer.networks")
 class DQN(Model):
@@ -68,20 +69,22 @@ class DQN(Model):
         q_values = self._comb_mlp(combined, training=True)
 
         return q_values
-    
+
     def get_config(self):
         """
         Method that returns the config dictionary for serialization.
         """
 
         config = super().get_config()
-        config.update({
-            "action_dim": self._action_dim,
-            "image_shape": self._image_shape,
-        })
+        config.update(
+            {
+                "action_dim": self._action_dim,
+                "image_shape": self._image_shape,
+            }
+        )
 
         return config
-    
+
     @classmethod
     def from_config(cls, config):
         """

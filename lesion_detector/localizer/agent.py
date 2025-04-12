@@ -47,7 +47,9 @@ class LocalizerAgent:
         self._global_step = 0
         self._epsilon = self._epsilon_start
 
-    def select_action(self, obs: NDArray[np.float32], mask: np.ndarray, training: bool = True):
+    def select_action(
+        self, obs: NDArray[np.float32], mask: np.ndarray, training: bool = True
+    ):
         # Epsilon-greedy policy (only during training)
         if training and np.random.rand() < self._epsilon:
             allowed_actions = np.where(mask == 1)[0]
