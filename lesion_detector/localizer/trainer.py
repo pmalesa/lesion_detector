@@ -92,12 +92,17 @@ def evaluate_localizer(config, model_weights_path: str):
     env = LocalizerEnv(config)
     agent = LocalizerAgent(config)
     agent.load_model(model_weights_path)
-    config = config["test"]
+    success_iou = config["test"]["success_iou"]
+
+    iou_values = []
+    dist_values = []
+    steps_values = []
+    success_episodes = 0
 
     # Iterate over all test key slice images
     image_names = get_image_names("test", dataset_metadata)
+
     for i, image_name in enumerate(image_names):
-        logger.info(f"Loaded image {i + 1}: {image_name}.")
         image_path = f"../data/deeplesion/key_slices/{image_name}"
         image_metadata = get_image_metadata(dataset_metadata, image_name)
 
@@ -106,14 +111,35 @@ def evaluate_localizer(config, model_weights_path: str):
         while not done:
             mask = env.get_available_actions()
             action = agent.select_action(obs, mask, training=False)
-            next_obs, reward, done, info = env.step(action)
+            next_obs, _, done, info = env.step(action)
             obs = next_obs
 
+        if info["iou"] >= success_iou:
+            success_episodes += 1
+
+        iou_values.append(info["iou"])
+        dist_values.append(info["dist"])
+        steps_values.append(info["steps"])
+
         logger.info(
-            f"Image {image_name} - Final IoU: {info['iou']} - Total steps: {info['steps']}"
+            f"Image {i + 1} ({image_name}) | "
+            f"Final IoU: {info['iou']} | "
+            f"Total steps: {info['steps']}"
         )
 
     logger.info("Localizer evaluation finished.")
+
+    success_rate = round(success_episodes / len(image_names), 2)
+    average_iou = round(np.mean(iou_values), 4)
+    average_dist = round(np.mean(dist_values), 4)
+    average_steps = np.mean(steps_values)
+
+    logger.info(
+        f"\n    Success rate: {success_rate}"
+        f"\n    Average IoU: {average_iou}"
+        f"\n    Average distance: {average_dist}"
+        f"\n    Average steps: {average_steps}"
+    )
 
 
 def show_available_devices():
@@ -128,6 +154,7 @@ def show_available_devices():
     logger.info(message)
 
 
+# TODO - move it to the image_utils.py file
 def get_image_names(split_type_str: str, metadata: pd.DataFrame):
     """
     Returns a list of key slices' image names, given the split

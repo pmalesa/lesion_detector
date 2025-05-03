@@ -43,7 +43,8 @@ train:
   output_dir: "../runs/localizer"       # path for saving logs, checkpoints etc.
 
 test:
-  test_episodes: 20
+  test_episodes: 20                     # TODO
+  success_iou: 0.4
   model_checkpoint: "../runs/localizer/checkpoints/agent_lastest.pt"
 
 logging:
