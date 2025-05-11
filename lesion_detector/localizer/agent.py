@@ -1,6 +1,5 @@
 import logging
 
-import cv2
 import numpy as np
 import tensorflow as tf
 from keras.optimizers import Adam
@@ -24,7 +23,7 @@ class LocalizerAgent:
         self._epsilon_end = self._config.get("epsilon_end", 0.1)
         self._epsilon_decay = self._config.get("epsilon_decay", 10000)
         self._target_update_steps = self._config.get("target_update_steps", 100)
-        self._fixed_patch_length = self._config.get("fixed_patch_length", 64)
+        self._fixed_patch_length = self._config.get("fixed_patch_length", 128)
 
         # Initialize replay buffer and cache
         capacity = self._config.get("replay_buffer_size", 10000)
@@ -57,13 +56,10 @@ class LocalizerAgent:
         else:
             img_patch = obs
 
-            # Resize patch to a fixed size (64, 64)
-            resized_patch = self._resize_patch(img_patch)
+            # Replicate patch across three channels (128, 128, 3)
+            patch_data = np.repeat(img_patch[..., np.newaxis], 3, axis=-1)
 
-            # Replicate patch across three channels (64, 64, 3)
-            patch_data = np.repeat(resized_patch[..., np.newaxis], 3, axis=-1)
-
-            # Convert into (1, 64, 64, 3), by adding batch dimension
+            # Convert into (1, 128, 128, 3), by adding batch dimension
             patch_input = np.expand_dims(patch_data, axis=0)
 
             q_values = self._q_network(patch_input)
@@ -164,25 +160,11 @@ class LocalizerAgent:
         for obs in observations:
             img_patch = obs
 
-            resized_patch = self._resize_patch(img_patch)
-
             # Replicate grayscale channel across 3 channels
-            resized_patch = np.repeat(resized_patch[..., np.newaxis], 3, axis=-1)
+            img_patch = np.repeat(img_patch[..., np.newaxis], 3, axis=-1)
 
-            resized_patch_batch.append(resized_patch)
+            resized_patch_batch.append(img_patch)
 
         resized_patch_tensor = np.array(resized_patch_batch, dtype=np.float32)
 
         return resized_patch_tensor
-
-    def _resize_patch(self, img_patch: np.ndarray) -> np.ndarray:
-        """
-        Resizes the cropped image patch into a fixed sized patch.
-        If the size is already correct, then the input image
-        patch is returned with no resizing.
-        """
-
-        fixed_shape = (self._fixed_patch_length, self._fixed_patch_length)
-        if img_patch.shape == fixed_shape:
-            return img_patch
-        return cv2.resize(img_patch, fixed_shape, interpolation=cv2.INTER_AREA)

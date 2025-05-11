@@ -22,6 +22,7 @@ class LocalizerEnv:
     }
 
     def __init__(self, config):
+        self._fixed_patch_length = config["agent"].get("fixed_patch_length", 128)
         self._config = config["environment"]
         self._render = self._config.get("render", False)
         self._image_metadata = None
@@ -212,7 +213,8 @@ class LocalizerEnv:
     def _get_patch_with_margin(self) -> NDArray[np.float32]:
         """
         Returns 2D np.array of pixel data from within the current
-        bounding box with additional margin (10 pixels by default).
+        bounding box with additional margin (10 pixels by default),
+        resized to a fixed size (128 by 128 pixels by default).
         """
 
         (x, y, w, h) = self._bbox
@@ -223,7 +225,21 @@ class LocalizerEnv:
         x_2 = min(self._image_width - 1, x + w + self._bbox_pixel_margin)
         y_2 = min(self._image_height - 1, y + h + self._bbox_pixel_margin)
 
-        return self._image_data[y_1:y_2, x_1:x_2]
+        patch_data = self._image_data[y_1:y_2, x_1:x_2]
+
+        return self._resize_patch(patch_data)
+
+    def _resize_patch(self, img_patch: np.ndarray) -> NDArray[np.float32]:
+        """
+        Resizes the cropped image patch into a fixed sized patch.
+        If the size is already correct, then the input image
+        patch is returned with no resizing.
+        """
+
+        fixed_shape = (self._fixed_patch_length, self._fixed_patch_length)
+        if img_patch.shape == fixed_shape:
+            return img_patch
+        return cv2.resize(img_patch, fixed_shape, interpolation=cv2.INTER_AREA)
 
     def _compute_reward(self) -> float:
         """
