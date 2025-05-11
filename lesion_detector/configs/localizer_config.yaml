@@ -30,14 +30,14 @@ agent:
   gamma: 0.99                           # discount factor
   epsilon_start: 1.0
   epsilon_end: 0.01
-  epsilon_decay: 1500                   # Number of global steps (not episodes!) after which the epsilon will reach its minimum value
+  epsilon_decay: 1500                    # Number of global steps (not episodes!) after which the epsilon will reach its minimum value
   replay_buffer_size: 10000
   target_update_steps: 500              # Number of steps after which the target network is updated
   batch_size: 64 # 64
   fixed_patch_length: 64                # Fixed length (widht/height) of the patch (input width/height of the CNN) 
 
 train:
-  train_episodes: 10
+  train_episodes: 300
   log_interval: 1                       # print/log progress every x episodes
   save_interval: 50                     # chackpoint model every x episodes
   output_dir: "../runs/localizer"       # path for saving logs, checkpoints etc.

@@ -32,7 +32,8 @@ def train_localizer(config):
     # Iterate over all training key slice images
     image_names = get_image_names("train", dataset_metadata)
     for i, image_name in enumerate(image_names):
-        image_name = image_names[1666]  # TODO
+        # image_name = image_names[1666]  # TODO
+        image_name = "000001_03_01_088.png"
         logger.info(f"Loaded image {i + 1}: {image_name}.")
         image_path = f"../data/deeplesion/key_slices/{image_name}"
         agent.reset()
@@ -40,6 +41,7 @@ def train_localizer(config):
         for episode in range(num_episodes):
             image_metadata = get_image_metadata(dataset_metadata, image_name)
             obs = env.reset(image_path, image_metadata)
+            env.render()
 
             episode_reward = 0.0
             losses = []
@@ -50,6 +52,7 @@ def train_localizer(config):
                 mask = env.get_available_actions()
                 action = agent.select_action(obs, mask)
                 next_obs, reward, done, info = env.step(action)
+                env.render()
                 agent.store_experience((obs, action, reward, next_obs, done))
                 loss = agent.update()
                 episode_reward += reward

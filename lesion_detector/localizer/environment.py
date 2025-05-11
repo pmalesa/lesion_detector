@@ -158,9 +158,6 @@ class LocalizerEnv:
         )
         self._current_step += 1
 
-        if self._render:
-            self._render_bboxes()
-
         return next_obs, reward, done, info
 
     def get_available_actions(self) -> np.ndarray:
@@ -187,10 +184,13 @@ class LocalizerEnv:
 
         return np.array(possible_actions, dtype=np.int32)
 
-    def _render_bboxes(self):
+    def render(self):
         """
         Renders the image with both current and target bounding boxes.
         """
+
+        if not self._render:
+            return
 
         # Rescale the image to 8-bit precision
         gray_8bit = np.clip(self._image_data * 255, 0, 255).astype(np.uint8)
@@ -262,6 +262,7 @@ class LocalizerEnv:
 
         return iou_reward + delta_iou_reward + delta_dist_reward + self._step_penalty
 
+    # TODO - change thresholds
     def _compute_final_reward(self) -> float:
         """
         Computes the reward after conducting the FINAL action,
@@ -278,6 +279,7 @@ class LocalizerEnv:
 
         return self._compute_reward() + additional_reward
 
+    # TODO - should the negative reward be also halved?
     def _compute_timeout_reward(self) -> float:
         """
         Computes the reward after reaching the maximal
@@ -359,6 +361,7 @@ class LocalizerEnv:
         """
         Checks whether the episode should end.
         """
+
         condition_1 = self._current_step >= self._max_steps
         condition_2 = self._get_iou() >= 0.8
 
