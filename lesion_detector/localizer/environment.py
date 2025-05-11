@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 from common.image_utils import load_image
 from common.metrics import dist, iou
-from localizer.utils.action_history import ActionHistory
 from numpy.typing import NDArray
 
 
@@ -42,10 +41,6 @@ class LocalizerEnv:
         self._move_step_factor = self._config.get("bbox_move_step_factor", 0.1)
         self._resize_factor = self._config.get("bbox_resize_factor", 0.1)
         self._iou_threshold = self._config.get("iou_threshold", 0.7)
-        self._n_previous_actions = self._config.get("n_previous_actions", 10)
-        self._action_history = ActionHistory(
-            length=self._n_previous_actions, n_actions=9
-        )
 
         # Reward function weights
         self._config = self._config["reward"]
@@ -78,7 +73,6 @@ class LocalizerEnv:
         and the coordinates of the target bounding box
         """
 
-        self._action_history.clear()
         self._init_image_data(image_path, image_metadata)
         self._init_target_bbox()
         self._reset_bbox()
@@ -97,7 +91,6 @@ class LocalizerEnv:
         Performs a step, given a specific action ID.
         """
 
-        self._action_history.add(action_id)
         action = self.ACTIONS[action_id]
 
         match action:
@@ -211,14 +204,10 @@ class LocalizerEnv:
     def _get_observation(self) -> NDArray[np.float32]:
         """
         Returns the observation as a tuple containing cropped
-        image from the current bounding box (+ margin) and a
-        vector of 10 previous actions.
+        image from the current bounding box (+ margin).
         """
 
-        return (
-            self._get_patch_with_margin(),
-            self._action_history.get_history_vector(),
-        )
+        return self._get_patch_with_margin()
 
     def _get_patch_with_margin(self) -> NDArray[np.float32]:
         """

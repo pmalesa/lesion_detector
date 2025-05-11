@@ -55,7 +55,7 @@ class LocalizerAgent:
             allowed_actions = np.where(mask == 1)[0]
             action = np.random.choice(allowed_actions)
         else:
-            (img_patch, prev_actions) = obs
+            img_patch = obs
 
             # Resize patch to a fixed size (64, 64)
             resized_patch = self._resize_patch(img_patch)
@@ -66,10 +66,7 @@ class LocalizerAgent:
             # Convert into (1, 64, 64, 3), by adding batch dimension
             patch_input = np.expand_dims(patch_data, axis=0)
 
-            # Convert into (1, 90), by adding batch dimension
-            prev_actions_input = np.expand_dims(prev_actions, axis=0)
-
-            q_values = self._q_network((patch_input, prev_actions_input))
+            q_values = self._q_network(patch_input)
 
             # Convert the tensorflow tensor into numpy array
             q_values = q_values.numpy()[0]
@@ -157,17 +154,15 @@ class LocalizerAgent:
 
     def _prepare_batch(self, observations: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """
-        Takes observations as an array of tuples with image patch of various size
-        and a vector of history of previous actions. It returns them as tuple with
-        two arrays (resized_patch_tensor, prev_actions_tensor), where the resized
-        patch has a fixed-sized (128 x 128 pixels by default).
+        Takes observations as an array of tuples with image patch
+        of various size. It returns an array resized_patch_tensor,
+        where the resized patch has a fixed-sized (128 x 128 pixels by default).
         """
 
         resized_patch_batch = []
-        prev_actions_batch = []
 
         for obs in observations:
-            (img_patch, prev_actions) = obs
+            img_patch = obs
 
             resized_patch = self._resize_patch(img_patch)
 
@@ -175,12 +170,10 @@ class LocalizerAgent:
             resized_patch = np.repeat(resized_patch[..., np.newaxis], 3, axis=-1)
 
             resized_patch_batch.append(resized_patch)
-            prev_actions_batch.append(prev_actions)
 
         resized_patch_tensor = np.array(resized_patch_batch, dtype=np.float32)
-        prev_actions_tensor = np.array(prev_actions_batch, dtype=np.float32)
 
-        return resized_patch_tensor, prev_actions_tensor
+        return resized_patch_tensor
 
     def _resize_patch(self, img_patch: np.ndarray) -> np.ndarray:
         """

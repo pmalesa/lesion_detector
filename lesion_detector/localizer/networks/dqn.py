@@ -8,12 +8,11 @@ from tensorflow.keras.utils import register_keras_serializable
 class DQN(Model):
     """
     Implementation of a simple DQN model, that extracts features
-    via pretrained CNN into a 1D vector and contatenates it with the
-    normalized bounding box parameters (x, y, w, h), which serves
-    as input and outputs Q-values for action_dim discrete actions
+    via pretrained CNN into a 1D vector, which serves as input to
+    an MLP head and then outputs Q-values for action_dim discrete actions
     """
 
-    def __init__(self, action_dim=9, image_shape=(64, 64, 3), **kwargs):
+    def __init__(self, action_dim=9, image_shape=(128, 128, 3), **kwargs):
         super().__init__(**kwargs)
 
         self._action_dim = action_dim
@@ -29,13 +28,8 @@ class DQN(Model):
         self._cnn.layers[-5].trainable = True
         self._cnn_out_dim = 2048
 
-        # # MLP component for previous actons
-        self._hist_mlp = tf.keras.Sequential(
-            [layers.Dense(64, activation="relu"), layers.Dense(32, activation="relu")]
-        )
-
-        # Combined MLP (Q-network)
-        self._comb_mlp = tf.keras.Sequential(
+        # MLP head
+        self._mlp_head = tf.keras.Sequential(
             [
                 layers.Dense(128, activation="relu"),
                 layers.Dense(64, activation="relu"),
@@ -53,20 +47,16 @@ class DQN(Model):
         """
         Method being a single forward pass through the network.
         inputs argument is a 2D array of cropped patch pixel data
-        and previous actions of shape (batch, patch_data, prev_actions)
+        of shape (batch, patch_data)
         """
 
-        img_patch_tensor, prev_actions_tensor = inputs
+        img_patch_tensor = inputs
 
         # training=True means that there will be updates made on
         # batch norm layers if needed. It will not freeze the unfreezed layers!
         img_features = self._cnn(img_patch_tensor, training=False)
 
-        history_features = self._hist_mlp(prev_actions_tensor, training=True)
-
-        combined = tf.concat([img_features, history_features], axis=-1)
-
-        q_values = self._comb_mlp(combined, training=True)
+        q_values = self._mlp_head(img_features, training=True)
 
         return q_values
 

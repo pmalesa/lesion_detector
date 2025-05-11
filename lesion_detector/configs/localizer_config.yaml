@@ -15,7 +15,6 @@ environment:
   bbox_randomize: true
   bbox_position_shift_range: 64         # Value by which x or y coordinate of the bounding box can vary in both directions when initialized
   bbox_size_shift_range: 10             # Value by which width and height of the bounding box can vary when initialized
-  n_previous_actions: 10                # Number of previous actions stored in the observation
   iou_threshold: 0.7
 
   reward:
@@ -30,11 +29,11 @@ agent:
   gamma: 0.99                           # discount factor
   epsilon_start: 1.0
   epsilon_end: 0.01
-  epsilon_decay: 1500                    # Number of global steps (not episodes!) after which the epsilon will reach its minimum value
+  epsilon_decay: 1500                   # Number of global steps (not episodes!) after which the epsilon will reach its minimum value
   replay_buffer_size: 10000
   target_update_steps: 500              # Number of steps after which the target network is updated
   batch_size: 64 # 64
-  fixed_patch_length: 64                # Fixed length (widht/height) of the patch (input width/height of the CNN) 
+  fixed_patch_length: 128               # Fixed length (widht/height) of the patch (input width/height of the CNN) 
 
 train:
   train_episodes: 300
