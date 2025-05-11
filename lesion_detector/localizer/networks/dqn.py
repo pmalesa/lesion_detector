@@ -13,8 +13,8 @@ class DQN(Model):
     as input and outputs Q-values for action_dim discrete actions
     """
 
-    def __init__(self, action_dim=9, image_shape=(64, 64, 3)):
-        super().__init__()
+    def __init__(self, action_dim=9, image_shape=(64, 64, 3), **kwargs):
+        super().__init__(**kwargs)
 
         self._action_dim = action_dim
         self._image_shape = image_shape
@@ -84,15 +84,3 @@ class DQN(Model):
         )
 
         return config
-
-    @classmethod
-    def from_config(cls, config):
-        """
-        Method called by Keras to create a new instance of a class
-        from given config.
-        """
-
-        config.pop("trainable", None)
-        config.pop("dtype", None)
-
-        return cls(**config)

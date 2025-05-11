@@ -4,7 +4,8 @@ import sys
 from pathlib import Path
 
 from common.file_utils import load_config
-from localizer.trainer import evaluate_localizer, train_localizer
+from localizer.evaluation import evaluate_localizer
+from localizer.trainer import train_localizer
 
 
 def main():
@@ -23,7 +24,7 @@ def main():
         help="Specify which task to run/",
     )
     parser.add_argument(
-        "--run_dir",
+        "--run-dir",
         type=str,
         required=False,
         help="Path to the trained model directory (required for evaluation)",

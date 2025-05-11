@@ -33,13 +33,13 @@ python main.py --task train_localizer
 
 ## Run evaluation
 ```bash
-python main.py --task eval_localizer --run_dir=<run_path>
+python main.py --task eval_localizer --run-dir <run_path>
 ```
 
 ## Plot results
 To plot the obtained results from a training or evaluation run use the plot_results.py script located in the scripts/ folder in the root directory.
 ```bash
-python plot_results.py --csv_file <csv_file_path>
+python plot_results.py --csv-file <csv_file_path>
 ```
 
 ## Pre-commit Hooks Configuration
