@@ -128,18 +128,14 @@ class LocalizerEnv:
 
                 return (
                     self._get_observation(),
-                    self._compute_final_reward(),
+                    self._compute_reward(final=True),
                     True,
                     info,
                 )
 
         next_obs = self._get_observation()
         done = self._check_done()
-        reward = None
-        if done:
-            reward = self._compute_timeout_reward()
-        else:
-            reward = self._compute_reward()
+        reward = self._compute_reward(final=done, timeout=done)
         info = (
             {}
             if not done
@@ -241,10 +237,9 @@ class LocalizerEnv:
             return img_patch
         return cv2.resize(img_patch, fixed_shape, interpolation=cv2.INTER_AREA)
 
-    def _compute_reward(self) -> float:
+    def _compute_reward(self, final: bool = False, timeout: bool = False) -> float:
         """
-        Computes the reward, that includes three components:
-        * Component proportional to the IoU metric,
+        Computes the reward (including bonus), that includes three components:
         * Component proportional to the IoU metric change,
         * Component inversely proportional to the distance change between centers,
         * Step penalty component.
@@ -252,8 +247,7 @@ class LocalizerEnv:
 
         iou_val, dist_val = self._get_iou(), self._get_distance()
 
-        iou_reward = self._alpha_1 * iou_val
-
+        # Compute the main reward
         delta_iou_reward = 0.0
         if self._prev_iou:
             delta_iou_reward = self._alpha_2 * (iou_val - self._prev_iou)
@@ -265,41 +259,22 @@ class LocalizerEnv:
         self._prev_iou = iou_val
         self._prev_dist = dist_val
 
-        return iou_reward + delta_iou_reward + delta_dist_reward + self._step_penalty
+        reward = delta_iou_reward + delta_dist_reward + self._step_penalty
 
-    # TODO - change thresholds
-    def _compute_final_reward(self) -> float:
-        """
-        Computes the reward after conducting the FINAL action,
-        which ends an episode.
-        """
+        # Compute the bonus component
+        if final:
+            if iou_val >= 0.7:
+                reward += (
+                    self._iou_final_reward if timeout else 2 * self._iou_final_reward
+                )
+            elif iou_val >= 0.5:
+                reward += (
+                    0.5 * self._iou_final_reward if timeout else self._iou_final_reward
+                )
+            else:
+                reward -= (1 - iou_val) * self._iou_final_reward
 
-        iou_val = self._get_iou()
-
-        additional_reward = 0.0
-        if iou_val >= self._iou_threshold:
-            additional_reward += self._iou_final_reward
-        elif iou_val < self._iou_threshold - 0.2:
-            additional_reward -= self._iou_final_reward
-
-        return self._compute_reward() + additional_reward
-
-    # TODO - should the negative reward be also halved?
-    def _compute_timeout_reward(self) -> float:
-        """
-        Computes the reward after reaching the maximal
-        number of steps without taking the FINAL action.
-        """
-
-        iou_val = self._get_iou()
-
-        additional_reward = 0.0
-        if iou_val >= self._iou_threshold:
-            additional_reward += self._iou_final_reward
-        elif iou_val < self._iou_threshold - 0.2:
-            additional_reward -= self._iou_final_reward
-
-        return self._compute_reward() + 0.5 * additional_reward
+        return reward
 
     def _get_iou(self) -> float:
         """
@@ -367,10 +342,7 @@ class LocalizerEnv:
         Checks whether the episode should end.
         """
 
-        condition_1 = self._current_step >= self._max_steps
-        condition_2 = self._get_iou() >= 0.8
-
-        return condition_1 or condition_2
+        return self._current_step >= self._max_steps
 
     def _init_target_bbox(self):
         """
@@ -518,10 +490,12 @@ class LocalizerEnv:
         condition_2 = self._bbox[3] > self._bbox_min_length
         return condition_1 and condition_2
 
+    # TODO - POPRAW
     def _can_increase_aspect_ratio(self) -> bool:
         w, h = self._bbox[2], self._bbox[3]
         return w / h < self._bbox_max_aspect_ratio
 
+    # TODO - POPRAW
     def _can_decrease_aspect_ratio(self) -> bool:
         w, h = self._bbox[2], self._bbox[3]
         return w / h > (1 / self._bbox_max_aspect_ratio)
