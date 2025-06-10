@@ -41,7 +41,7 @@ class LocalizerEnv:
         self._bbox_size_shift_range = self._config.get("bbox_size_shift_range", 10.0)
         self._move_step_factor = self._config.get("bbox_move_step_factor", 0.1)
         self._resize_factor = self._config.get("bbox_resize_factor", 0.1)
-        self._iou_threshold = self._config.get("iou_threshold", 0.7)
+        # self._iou_threshold = self._config.get("iou_threshold", 0.7) # TODO - UNUSED
 
         # Reward function weights
         self._config = self._config["reward"]
@@ -75,7 +75,6 @@ class LocalizerEnv:
         """
 
         self._init_image_data(image_path, image_metadata)
-        self._init_target_bbox()
         self._reset_bbox()
         self._current_step = 1
         self._prev_dist = None
@@ -263,7 +262,7 @@ class LocalizerEnv:
 
         # Compute the bonus component
         if final:
-            if iou_val >= 0.7:
+            if iou_val >= 0.75:
                 reward += (
                     self._iou_final_reward if timeout else 2 * self._iou_final_reward
                 )
@@ -272,7 +271,7 @@ class LocalizerEnv:
                     0.5 * self._iou_final_reward if timeout else self._iou_final_reward
                 )
             else:
-                reward -= (1 - iou_val) * self._iou_final_reward
+                reward -= self._iou_final_reward
 
         return reward
 
@@ -297,23 +296,41 @@ class LocalizerEnv:
         """
 
         self._image_metadata = image_metadata
-        self._image_data = load_image(image_path, norm=True)
+        self._image_data = load_image(image_path, image_metadata, norm=True)
         self._image_name = self._image_metadata["File_name"]
         self._image_height = self._image_data.shape[0]
         self._image_width = self._image_data.shape[1]
+
+        # Initialize target bounding box
+        target_bbox_str = self._image_metadata["Bounding_boxes"]
+        target_bbox_coords = [float(val) for val in target_bbox_str.split(",")]
+        x1, y1, x2, y2 = [round(c) for c in target_bbox_coords]
+
+        # Rescale to (512 x 512) if necessary
+        if (self._image_height, self._image_width) != (512, 512):
+            cv2.resize(self._image_data, (512, 512), interpolation=cv2.INTER_AREA)
+            x1 *= round(512 / self._image_width)
+            y1 *= round(512 / self._image_height)
+            x2 *= round(512 / self._image_width)
+            y2 *= round(512 / self._image_height)
+            self._image_height = 512
+            self._image_width = 512
+
         self._max_dist = np.sqrt(self._image_width**2 + self._image_height**2)
+        w, h = x2 - x1, y2 - y1
+        self._target_bbox = np.array([x1, y1, w, h])
 
     def _reset_bbox(self):
         """
         Resets current bounding box' parameters.
         """
 
+        # Calculate random size and position shifts
         random_size_shift = (
             random.randint(-self._bbox_size_shift_range, self._bbox_size_shift_range)
             if self._bbox_randomize
             else 0
         )
-
         random_x_shift = (
             random.randint(
                 -self._bbox_position_shift_range, self._bbox_position_shift_range
@@ -321,7 +338,6 @@ class LocalizerEnv:
             if self._bbox_randomize
             else 0
         )
-
         random_y_shift = (
             random.randint(
                 -self._bbox_position_shift_range, self._bbox_position_shift_range
@@ -333,8 +349,8 @@ class LocalizerEnv:
         w = self._initial_bbox_width + random_size_shift
         h = self._initial_bbox_height + random_size_shift
 
-        x = int((self._image_width - w) / 2) + random_x_shift
-        y = int((self._image_height - h) / 2) + random_y_shift
+        x = round((self._image_width - w) / 2) + random_x_shift
+        y = round((self._image_height - h) / 2) + random_y_shift
         self._bbox = np.array([x, y, w, h])
 
     def _check_done(self) -> bool:
@@ -343,17 +359,6 @@ class LocalizerEnv:
         """
 
         return self._current_step >= self._max_steps
-
-    def _init_target_bbox(self):
-        """
-        Calculates ground truth bounding box' parameters.
-        """
-
-        target_bbox_str = self._image_metadata["Bounding_boxes"]
-        target_bbox_coords = [float(val) for val in target_bbox_str.split(",")]
-        x1, y1, x2, y2 = [int(c) for c in target_bbox_coords]
-        w, h = x2 - x1, y2 - y1
-        self._target_bbox = np.array([x1, y1, w, h])
 
     def _normalize_bbox(self, bbox: np.ndarray) -> NDArray[np.float32]:
         """

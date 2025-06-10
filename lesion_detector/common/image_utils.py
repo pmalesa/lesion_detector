@@ -8,12 +8,19 @@ from PIL import Image
 
 
 def load_image(
-    path: str, hu_scale: bool = True, norm: bool = True, per_image_norm: bool = True
+    path: str,
+    image_metadata: pd.DataFrame,
+    hu_scale: bool = True,
+    norm: bool = True,
+    per_image_norm: bool = True,
 ):
     img = Image.open(path)
     img_array = np.array(img)
     if hu_scale:
-        return convert_to_hu(img_array, norm)
+        hu_min_str, hu_max_str = image_metadata["DICOM_windows"].split(",")
+        hu_min = float(hu_min_str.strip())
+        hu_max = float(hu_max_str.strip())
+        return convert_to_hu(img_array, norm, hu_min, hu_max)
     elif norm:
         return normalize(img_array, per_image_norm)
     return img_array
