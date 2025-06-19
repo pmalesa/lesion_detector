@@ -1,4 +1,5 @@
-from typing import Any
+from pathlib import Path
+from typing import Any, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -99,3 +100,16 @@ def get_image_names(split_type_str: str, metadata: pd.DataFrame):
             image_names.append(metadata["File_name"][i])
 
     return image_names
+
+
+def get_image_paths(image_names: List[str], dir: str) -> List[Path]:
+    """
+    Returns a list of image paths created from passed
+    list of image names and specified directory.
+    """
+
+    directory = Path(dir)
+    image_paths = []
+    for image_name in image_names:
+        image_paths.append(directory / image_name)
+    return image_paths

@@ -1,14 +1,17 @@
 import random
 
 import cv2
+import gymnasium as gym
 import numpy as np
 import pandas as pd
-from common.image_utils import load_image
+from common.file_utils import extract_filename
+from common.image_utils import get_image_metadata, load_image
 from common.metrics import dist, iou
+from gymnasium import spaces
 from numpy.typing import NDArray
 
 
-class LocalizerEnv:
+class LocalizerEnv(gym.Env):
     ACTIONS = {
         0: "MOVE_UP",
         1: "MOVE_DOWN",
@@ -21,11 +24,16 @@ class LocalizerEnv:
         8: "FINISH",
     }
 
-    def __init__(self, config):
+    def __init__(self, config, image_paths, dataset_metadata):
+        super().__init__()
+        self._image_paths = image_paths
+        self._dataset_metadata = dataset_metadata
+        self._image_metadata = None
+        self._idx = 0
+
         self._fixed_patch_length = config["agent"].get("fixed_patch_length", 128)
         self._config = config["environment"]
         self._render = self._config.get("render", False)
-        self._image_metadata = None
 
         self._max_steps = self._config.get("max_steps", 100)
         self._initial_bbox_width = self._config.get("initial_bbox_width", 50)
@@ -68,15 +76,31 @@ class LocalizerEnv:
         self._bbox = None
         self._target_bbox = None
 
-    def reset(self, image_path: str, image_metadata: pd.DataFrame):
+        # Action and observation space
+        self.action_space = spaces.Discrete(len(self.ACTIONS))
+        self.observation_space = spaces.Box(
+            low=0.0,
+            high=1.0,
+            shape=(1, self._fixed_patch_length, self._fixed_patch_length),
+            dtype=np.float32,
+        )
+
+    def reset(self, *, seed=None, options=None) -> NDArray[np.float32]:
         """
-        Resets the environment and returns the image pixel data
-        and the coordinates of the target bounding box
+        Resets the environment by choosing the
+        next image and returns the image pixel
+        data and the coordinates of the target bounding box.
         """
+        self._idx = 20
+        image_path = self._image_paths[self._idx]
+        image_name = extract_filename(image_path)
+        image_metadata = get_image_metadata(self._dataset_metadata, image_name)
 
         self._init_image_data(image_path, image_metadata)
         self._reset_bbox()
-        self._current_step = 1
+
+        # self._idx = (self._idx + 1) % len(self._image_paths)
+        self._current_step = 0
         self._prev_dist = None
         self._prev_iou = None
 
@@ -84,12 +108,18 @@ class LocalizerEnv:
             cv2.namedWindow("Rendered Image", cv2.WINDOW_NORMAL)
             cv2.resizeWindow("Rendered Image", 600, 600)
 
-        return self._get_observation()
+        return self._get_observation(), {}
 
     def step(self, action_id):
         """
         Performs a step, given a specific action ID.
         """
+
+        # Handle illegal actions
+        mask = self.get_available_actions()
+        if mask[action_id] == 0:
+            next_obs = self._get_observation()
+            return next_obs, -5.0, False, False, {}
 
         action = self.ACTIONS[action_id]
 
@@ -115,6 +145,7 @@ class LocalizerEnv:
             case "DECREASE_ASPECT_RATIO":
                 self._decrease_aspect_ratio()
             case "FINISH":
+                self._current_step += 1
                 info = {
                     "bbox": self._bbox,
                     "steps": self._current_step,
@@ -129,15 +160,18 @@ class LocalizerEnv:
                     self._get_observation(),
                     self._compute_reward(final=True),
                     True,
+                    False,
                     info,
                 )
 
         next_obs = self._get_observation()
-        done = self._check_done()
-        reward = self._compute_reward(final=done, timeout=done)
+        terminated = False
+        truncated = self._check_done()
+        reward = self._compute_reward(final=terminated, timeout=truncated)
+        self._current_step += 1
         info = (
             {}
-            if not done
+            if not truncated
             else {
                 "bbox": self._bbox,
                 "steps": self._current_step,
@@ -145,9 +179,8 @@ class LocalizerEnv:
                 "dist": round(self._get_distance(), 4),
             }
         )
-        self._current_step += 1
 
-        return next_obs, reward, done, info
+        return next_obs, reward, terminated, truncated, info
 
     def get_available_actions(self) -> np.ndarray:
         """
@@ -195,15 +228,15 @@ class LocalizerEnv:
         cv2.rectangle(rgb, (x, y), (x + w, y + h), (0, 255, 0), thickness=1)
 
         cv2.imshow("Rendered Image", rgb)
-        cv2.waitKey(10)
+        cv2.waitKey(1)
 
     def _get_observation(self) -> NDArray[np.float32]:
         """
         Returns the observation as a tuple containing cropped
-        image from the current bounding box (+ margin).
+        image of shape (1, H, W) from the current bounding box (+ margin).
         """
 
-        return self._get_patch_with_margin()
+        return np.expand_dims(self._get_patch_with_margin(), axis=0)
 
     def _get_patch_with_margin(self) -> NDArray[np.float32]:
         """
@@ -234,7 +267,10 @@ class LocalizerEnv:
         fixed_shape = (self._fixed_patch_length, self._fixed_patch_length)
         if img_patch.shape == fixed_shape:
             return img_patch
-        return cv2.resize(img_patch, fixed_shape, interpolation=cv2.INTER_AREA)
+        resized = cv2.resize(
+            img_patch, fixed_shape, interpolation=cv2.INTER_AREA
+        ).astype(np.float32)
+        return np.clip(resized, 0.0, 1.0)
 
     def _compute_reward(self, final: bool = False, timeout: bool = False) -> float:
         """
@@ -308,7 +344,9 @@ class LocalizerEnv:
 
         # Rescale to (512 x 512) if necessary
         if (self._image_height, self._image_width) != (512, 512):
-            cv2.resize(self._image_data, (512, 512), interpolation=cv2.INTER_AREA)
+            self._image_data = cv2.resize(
+                self._image_data, (512, 512), interpolation=cv2.INTER_AREA
+            )
             x1 *= round(512 / self._image_width)
             y1 *= round(512 / self._image_height)
             x2 *= round(512 / self._image_width)
@@ -455,7 +493,7 @@ class LocalizerEnv:
         h_new = min(self._bbox_max_length, h + 2 * step)
 
         if y_new + h_new > self._image_height:
-            h_new = self._image_width - y_new
+            h_new = self._image_height - y_new
 
         self._bbox[1] = y_new
         self._bbox[3] = h_new
@@ -468,7 +506,7 @@ class LocalizerEnv:
         h_new = max(self._bbox_min_length, h - 2 * step)
 
         if y_new + h_new > self._image_height:
-            h_new = self._image_width - y_new
+            h_new = self._image_height - y_new
 
         self._bbox[1] = y_new
         self._bbox[3] = h_new

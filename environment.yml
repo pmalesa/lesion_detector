@@ -2,6 +2,7 @@ name: lesion_detector_env
 channels: 
   - defaults
   - conda-forge
+  - pytorch
 dependencies:
   - python=3.12.0
 
@@ -19,6 +20,15 @@ dependencies:
   # - cudatoolkit=11.8.0
   # - cudnn=9.3.0.75
 
+  # PyTorch & Torchhvision
+  - pytorch=2.5.1
+  - torchvision=0.20.1
+
+  # RL algorithms & Gymnasium & Tensorboard
+  - stable-baselines3=2.6.0
+  - gymnasium=1.0.0
+  - tensorboard=2.19.0
+
   # Include pip for pip-only packages 
   - pip
 
@@ -30,5 +40,5 @@ dependencies:
     - isort==5.13.2
     - mypy==1.13.0
     - pytest==8.3.4
-    - tensorflow[and-cuda]==2.17.0
-    - tensorrt==10.9.0.34
+    # - tensorflow[and-cuda]==2.17.0
+    # - tensorrt==10.9.0.34
