@@ -42,7 +42,7 @@ def train_localizer(config):
     check_env(env)
     env = Monitor(env, "logs/")
 
-    train_steps = config["train"].get("train_steps", 200_000)
+    train_steps = config["train"].get("train_steps", 1_000_000)
     config = config["agent"]
     learning_rate = config.get("learning_rate", 1e-4)
     n_steps = config.get("n_steps", 3)
@@ -79,7 +79,7 @@ def train_localizer(config):
         target_update_interval=target_update_steps,
         train_freq=train_freq,
         verbose=1,
-        tensorboard_log="./tb_logs/",
+        tensorboard_log=None,
     )
 
     model.learn(

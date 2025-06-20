@@ -18,9 +18,12 @@ def load_image(
     img = Image.open(path)
     img_array = np.array(img)
     if hu_scale:
-        hu_min_str, hu_max_str = image_metadata["DICOM_windows"].split(",")
-        hu_min = float(hu_min_str.strip())
-        hu_max = float(hu_max_str.strip())
+        # hu_min_str, hu_max_str = image_metadata["DICOM_windows"].split(",")
+        # hu_min = float(hu_min_str.strip())
+        # hu_max = float(hu_max_str.strip())
+        # Try -300 and 300 later for soft-tissue window
+        hu_min = -160
+        hu_max = 240
         return convert_to_hu(img_array, norm, hu_min, hu_max)
     elif norm:
         return normalize(img_array, per_image_norm)

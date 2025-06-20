@@ -34,6 +34,7 @@ dependencies:
   # pip packages
   - pip:
     - git+https://github.com/DLR-RM/stable-baselines3.git@master
+    - git+https://github.com/Stable-Baselines-Team/stable-baselines3-contrib.git@master # TODO - may be not needed
     - pre-commit==4.0.1
     - black==24.10.0
     - flake8==7.1.1

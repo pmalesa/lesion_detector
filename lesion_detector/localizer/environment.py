@@ -115,11 +115,13 @@ class LocalizerEnv(gym.Env):
         Performs a step, given a specific action ID.
         """
 
+        self._current_step += 1
+
         # Handle illegal actions
         mask = self.get_available_actions()
         if mask[action_id] == 0:
             next_obs = self._get_observation()
-            return next_obs, -5.0, False, False, {}
+            return next_obs, -10.0, self._check_done(), False, {}
 
         action = self.ACTIONS[action_id]
 
@@ -145,42 +147,32 @@ class LocalizerEnv(gym.Env):
             case "DECREASE_ASPECT_RATIO":
                 self._decrease_aspect_ratio()
             case "FINISH":
-                self._current_step += 1
+                obs = self._get_observation()
+                reward = self._compute_reward(final=True, timeout=False)
+                terminated = True
+                truncated = False
                 info = {
                     "bbox": self._bbox,
                     "steps": self._current_step,
                     "iou": round(self._get_iou(), 4),
                     "dist": round(self._get_distance(), 4),
                 }
+                return obs, reward, terminated, truncated, info
 
-                # if self._render:
-                #     cv2.destroyAllWindows()
-
-                return (
-                    self._get_observation(),
-                    self._compute_reward(final=True),
-                    True,
-                    False,
-                    info,
-                )
-
-        next_obs = self._get_observation()
-        terminated = False
-        truncated = self._check_done()
-        reward = self._compute_reward(final=terminated, timeout=truncated)
-        self._current_step += 1
-        info = (
-            {}
-            if not truncated
-            else {
+        obs = self._get_observation()
+        terminated = self._check_done()
+        truncated = False
+        reward = self._compute_reward(final=False, timeout=terminated)
+        info = {}
+        if terminated:
+            info = {
                 "bbox": self._bbox,
                 "steps": self._current_step,
                 "iou": round(self._get_iou(), 4),
                 "dist": round(self._get_distance(), 4),
             }
-        )
 
-        return next_obs, reward, terminated, truncated, info
+        return obs, reward, terminated, truncated, info
 
     def get_available_actions(self) -> np.ndarray:
         """
