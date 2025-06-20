@@ -1,12 +1,12 @@
 import torch.nn as nn
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-from torchvision.models import resnet18, resnet50
+from torchvision.models import ResNet18_Weights, ResNet50_Weights, resnet18, resnet50
 
 
 class ResNet18Extractor(BaseFeaturesExtractor):
     def __init__(self, obs_space, features_dim=512):
         super().__init__(obs_space, features_dim)
-        resnet = resnet18(pretrained=True)
+        resnet = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
 
         # Grab the original weights (shape [64, 3, 7, 7]) and average them
         w = resnet.conv1.weight.data
@@ -35,7 +35,7 @@ class ResNet18Extractor(BaseFeaturesExtractor):
 class ResNet50Extractor(BaseFeaturesExtractor):
     def __init__(self, obs_space, features_dim=2048):
         super().__init__(obs_space, features_dim)
-        resnet = resnet50(pretrained=True)
+        resnet = resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
 
         # Replace the first conv layer and adapt to single-channel input
         w = resnet.conv1.weight.data

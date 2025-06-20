@@ -15,7 +15,7 @@ environment:
   bbox_randomize: false
   bbox_position_shift_range: 64         # Value by which x or y coordinate of the bounding box can vary in both directions when initialized
   bbox_size_shift_range: 10             # Value by which width and height of the bounding box can vary when initialized
-  iou_threshold: 0.7
+  iou_threshold: 0.7  # TO REMOVE
 
   reward:
     alpha_1: 1.0                        # Weight of the IoU reward component
@@ -27,6 +27,9 @@ environment:
 agent:
   learning_rate: 0.0001
   gamma: 0.9                            # Discount factor
+  tau: 1.0                              # Soft-update coefficient (1.0 - hard update)
+  n_steps: 3                            # n-steps rewards (n-step TD backup)
+  train_freq: 1                         # Update frequency - determines how often we perform the gradient update (in steps)
   epsilon_start: 1.0
   epsilon_end: 0.01
   epsilon_decay: 0.25                   # Fraction of all timesteps after which the epsilon will reach its minimum value
@@ -36,7 +39,8 @@ agent:
   fixed_patch_length: 64     # 128      # Fixed length (widht/height) of the patch (input width/height of the CNN) 
 
 train:
-  train_episodes: 250
+  train_episodes: 250 # TO REMOVE
+  train_steps: 200000
   log_interval: 1                       # Print/log progress every x episodes
   save_interval: 50                     # Checkpoint model every x episodes
   output_dir: "../runs/localizer"       # Path for saving logs, checkpoints etc.

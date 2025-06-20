@@ -91,7 +91,7 @@ class LocalizerEnv(gym.Env):
         next image and returns the image pixel
         data and the coordinates of the target bounding box.
         """
-        self._idx = 20
+
         image_path = self._image_paths[self._idx]
         image_name = extract_filename(image_path)
         image_metadata = get_image_metadata(self._dataset_metadata, image_name)
@@ -99,7 +99,7 @@ class LocalizerEnv(gym.Env):
         self._init_image_data(image_path, image_metadata)
         self._reset_bbox()
 
-        # self._idx = (self._idx + 1) % len(self._image_paths)
+        self._idx = (self._idx + 1) % len(self._image_paths)
         self._current_step = 0
         self._prev_dist = None
         self._prev_iou = None

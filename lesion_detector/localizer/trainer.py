@@ -1,4 +1,5 @@
 import logging
+import warnings
 
 # import numpy as np
 from common.file_utils import load_metadata
@@ -11,6 +12,17 @@ from localizer.networks.common import ResNet50Extractor
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.dqn import DQN
+
+warnings.filterwarnings(
+    "ignore",
+    message="It seems that your observation .* is an image but its `dtype` is",
+    module="stable_baselines3.common.env_checker",
+)
+warnings.filterwarnings(
+    "ignore",
+    message="It seems that your observation space .* is an image but the upper and lower bounds",
+    module="stable_baselines3.common.env_checker",
+)
 
 logger = logging.getLogger("LESION-DETECTOR")
 
@@ -30,21 +42,25 @@ def train_localizer(config):
     check_env(env)
     env = Monitor(env, "logs/")
 
+    train_steps = config["train"].get("train_steps", 200_000)
     config = config["agent"]
-
     learning_rate = config.get("learning_rate", 1e-4)
+    n_steps = config.get("n_steps", 3)
     discount_factor = config.get("discount_factor", 0.9)
+    tau = config.get("tau", 1.0)
     epsilon_start = config.get("epsilon_start", 1.0)
     epsilon_end = config.get("epsilon_end", 0.01)
     epsilon_decay = config.get("epsilon_decay", 0.25)
     replay_buffer_size = config.get("replay_buffer_size", 100_000)
     batch_size = config.get("batch_size", 32)
     target_update_steps = config.get("target_update_steps", 1000)
+    train_freq = config.get("train_freq", 1)
 
     policy_kwargs = dict(
         features_extractor_class=ResNet50Extractor,
         features_extractor_kwargs=dict(features_dim=2048),
         net_arch=[512, 256],  # Q-Network architecture
+        normalize_images=False,
     )
 
     model = DQN(
@@ -55,19 +71,19 @@ def train_localizer(config):
         exploration_fraction=epsilon_decay,
         policy_kwargs=policy_kwargs,
         learning_rate=learning_rate,
-        # n_steps=5, # TODO - TRY INSTALLING THE NEWEST SB3 VERSION FROM GITHUB
+        n_steps=n_steps,
         buffer_size=replay_buffer_size,
         batch_size=batch_size,
-        tau=1.0,
+        tau=tau,
         gamma=discount_factor,
         target_update_interval=target_update_steps,
-        train_freq=4,
+        train_freq=train_freq,
         verbose=1,
         tensorboard_log="./tb_logs/",
     )
 
     model.learn(
-        total_timesteps=200_000,
+        total_timesteps=train_steps,
         callback=RenderCallback(render_freq=1),
     )
     model.save("zoom_in_dqn")

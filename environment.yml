@@ -24,8 +24,7 @@ dependencies:
   - pytorch=2.5.1
   - torchvision=0.20.1
 
-  # RL algorithms & Gymnasium & Tensorboard
-  - stable-baselines3=2.6.0
+  # Gymnasium & Tensorboard
   - gymnasium=1.0.0
   - tensorboard=2.19.0
 
@@ -34,11 +33,10 @@ dependencies:
 
   # pip packages
   - pip:
+    - git+https://github.com/DLR-RM/stable-baselines3.git@master
     - pre-commit==4.0.1
     - black==24.10.0
     - flake8==7.1.1
     - isort==5.13.2
     - mypy==1.13.0
     - pytest==8.3.4
-    # - tensorflow[and-cuda]==2.17.0
-    # - tensorrt==10.9.0.34
