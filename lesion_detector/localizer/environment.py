@@ -24,12 +24,13 @@ class LocalizerEnv(gym.Env):
         8: "FINISH",
     }
 
-    def __init__(self, config, image_paths, dataset_metadata):
+    def __init__(self, config, image_paths, dataset_metadata, seed=42):
         super().__init__()
         self._image_paths = image_paths
         self._dataset_metadata = dataset_metadata
         self._image_metadata = None
         self._idx = 0
+        self._seed = seed
 
         self._fixed_patch_length = config["agent"].get("fixed_patch_length", 128)
         self._config = config["environment"]
@@ -77,12 +78,13 @@ class LocalizerEnv(gym.Env):
         self._target_bbox = None
 
         # Action and observation space
-        self.action_space = spaces.Discrete(len(self.ACTIONS))
+        self.action_space = spaces.Discrete(len(self.ACTIONS), seed=self._seed)
         self.observation_space = spaces.Box(
             low=0.0,
             high=1.0,
             shape=(1, self._fixed_patch_length, self._fixed_patch_length),
             dtype=np.float32,
+            seed=self._seed,
         )
 
     def reset(self, *, seed=None, options=None) -> NDArray[np.float32]:
@@ -92,14 +94,17 @@ class LocalizerEnv(gym.Env):
         data and the coordinates of the target bounding box.
         """
 
+        super().reset(seed=self._seed)
+
         image_path = self._image_paths[self._idx]
+        self._idx = (self._idx + 1) % len(self._image_paths)
+
         image_name = extract_filename(image_path)
         image_metadata = get_image_metadata(self._dataset_metadata, image_name)
 
         self._init_image_data(image_path, image_metadata)
         self._reset_bbox()
 
-        self._idx = (self._idx + 1) % len(self._image_paths)
         self._current_step = 0
         self._prev_dist = None
         self._prev_iou = None
@@ -119,11 +124,10 @@ class LocalizerEnv(gym.Env):
 
         # Handle illegal actions
         mask = self.get_available_actions()
-        if mask[action_id] == 0:
-            next_obs = self._get_observation()
-            return next_obs, -10.0, self._check_done(), False, {}
 
-        action = self.ACTIONS[action_id]
+        action = None
+        if mask[action_id] != 0:
+            action = self.ACTIONS[action_id]
 
         match action:
             case "MOVE_UP":
@@ -162,7 +166,9 @@ class LocalizerEnv(gym.Env):
         obs = self._get_observation()
         terminated = self._check_done()
         truncated = False
-        reward = self._compute_reward(final=False, timeout=terminated)
+        reward = (
+            self._compute_reward(final=False, timeout=terminated) if action else -10.0
+        )
         info = {}
         if terminated:
             info = {

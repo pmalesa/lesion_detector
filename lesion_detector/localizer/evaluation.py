@@ -1,17 +1,59 @@
 import logging
 
-# import numpy as np
-# from common.file_utils import load_metadata
-# from common.image_utils import get_image_metadata, get_image_names
-
-# from localizer.agent import LocalizerAgent
-# from localizer.environment import LocalizerEnv
+import numpy as np
+from common.file_utils import load_metadata
+from common.image_utils import create_image_paths, get_image_names
+from localizer.environment import LocalizerEnv
 
 logger = logging.getLogger("LESION-DETECTOR")
 
 
-def evaluate_localizer(config, model_weights_path: str):
-    pass
+def evaluate_localizer(model, algorithm: str, config, seed=42, run_dir=None):
+    """
+    Runs a deterministic policy on all training
+    images on a fresh environment and returns
+    arrays of final IoUs and steps counts.
+    """
+
+    logger.info("Starting localizer evaluation.")
+
+    if not run_dir:
+        logger.info("Run directory must be specified.")
+
+    # Load metadata
+    metadata_path = config.get("metadata_path", "")
+    dataset_metadata = load_metadata(metadata_path)
+
+    # Prepare image paths
+    val_image_names = get_image_names("val", dataset_metadata)
+    test_image_names = get_image_names("test", dataset_metadata)
+    image_names = val_image_names + test_image_names
+    image_paths = create_image_paths(image_names, "../data/deeplesion/key_slices/")
+
+    # Create and seed new environment
+    env = LocalizerEnv(config, image_paths, dataset_metadata, seed)
+    env.reset(seed=seed)
+    env.render()
+    env.action_space.seed(seed)
+
+    ious, steps = [], []
+
+    for _ in image_paths:
+        obs, _ = env.reset(seed=seed)
+        done = False
+        while not done:
+            action, _ = model.predict(obs, deterministic=True)
+            obs, reward, terminated, truncated, info = env.step(int(action))
+            env.render()
+            done = terminated or truncated
+
+        ious.append(info["iou"])
+        steps.append(info["steps"])
+        logger.info(f"Episode ended — terminated={terminated} info={info}")
+
+    logger.info("Localizer evaluation complete.")
+
+    return np.array(ious), np.array(steps)
 
 
 # def evaluate_localizer_custom(config, model_weights_path: str):

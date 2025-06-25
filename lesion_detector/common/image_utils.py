@@ -80,38 +80,38 @@ def get_image_metadata(metadata: pd.DataFrame, image_name: str):
     return metadata.loc[metadata["File_name"] == image_name].iloc[0]
 
 
-def get_image_names(split_type_str: str, metadata: pd.DataFrame):
+def get_image_names(split_type: str, metadata: pd.DataFrame):
     """
     Returns a list of key slices' image names, given the split
     type (train, validation or test).
     """
 
-    split_type = None
-    match split_type_str:
+    split_type_val = None
+    match split_type:
         case "train":
-            split_type = 1
+            split_type_val = 1
         case "validation":
-            split_type = 2
+            split_type_val = 2
         case "test":
-            split_type = 3
+            split_type_val = 3
         case _:
-            split_type = -1
+            split_type_val = -1
 
     image_names = []
     for i in range(len(metadata)):
-        if metadata["Train_Val_Test"][i] == split_type:
+        if metadata["Train_Val_Test"][i] == split_type_val:
             image_names.append(metadata["File_name"][i])
 
     return image_names
 
 
-def get_image_paths(image_names: List[str], dir: str) -> List[Path]:
+def create_image_paths(image_names: List[str], path: str) -> List[Path]:
     """
     Returns a list of image paths created from passed
-    list of image names and specified directory.
+    list of image names and specified path.
     """
 
-    directory = Path(dir)
+    directory = Path(path)
     image_paths = []
     for image_name in image_names:
         image_paths.append(directory / image_name)

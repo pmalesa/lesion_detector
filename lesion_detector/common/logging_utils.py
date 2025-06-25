@@ -2,11 +2,12 @@ import csv
 import os
 from datetime import datetime
 from pathlib import Path
+from typing import List
 
 import yaml
 
 
-def create_run_dir(config):
+def create_run_dir(config) -> Path:
     """
     Creates a timestamped directory for run's logs and outputs.
     """
@@ -17,14 +18,14 @@ def create_run_dir(config):
     return run_dir
 
 
-def init_log(path: str):
+def init_log(path: str, header: List[str]):
     """
     Initializes the CSV file used to store metrics and results.
     """
 
     with open(path, mode="w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["episode", "iou", "distance", "avg_loss", "total_reward"])
+        writer.writerow(header)
 
 
 def append_log(path: str, ep: int, iou: float, dist: float, loss: float, reward: float):

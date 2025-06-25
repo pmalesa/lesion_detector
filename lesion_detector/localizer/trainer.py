@@ -1,13 +1,16 @@
 import logging
+import random
 import warnings
 
-# import numpy as np
+import numpy as np
+import pandas as pd
+import torch
 from common.file_utils import load_metadata
-from common.image_utils import get_image_names, get_image_paths
+from common.image_utils import create_image_paths, get_image_names
+from common.logging_utils import create_run_dir, init_log, save_config
 from localizer.callbacks import RenderCallback
-
-# from common.logging_utils import append_log, create_run_dir, init_log, save_config
 from localizer.environment import LocalizerEnv
+from localizer.evaluation import evaluate_localizer
 from localizer.networks.common import ResNet50Extractor
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.monitor import Monitor
@@ -27,21 +30,82 @@ warnings.filterwarnings(
 logger = logging.getLogger("LESION-DETECTOR")
 
 
-def train_localizer(config):
-    logger.info("Starting localizer training.")
+def run_complete_training(config):
+    logger.info("Starting complete localizer training.")
+
+    seeds = [0, 42, 123, 999, 2025]
+    all_metrics = []
+    threshold = 0.5
+
+    # Initialize run's logs
+    run_dir = create_run_dir(config)
+    header = ["mean_iou", "mean_steps", "success_rate"]
+    csv_log_path = run_dir / "summary.csv"
+    init_log(csv_log_path, header)
+    save_config(run_dir, config)
+
+    for seed in seeds:
+        model, _ = train_single_localizer("dqn", config, seed, run_dir)
+        ious, steps = evaluate_localizer(model, "dqn", config, seed, run_dir)
+
+        mean_iou, std_iou = ious.mean(), ious.std()
+        mean_steps, std_steps = steps.mean(), steps.std()
+        success_rate = (ious >= threshold).mean()
+
+        all_metrics.append(
+            {
+                "seed": seed,
+                "mean_iou": mean_iou,
+                "std_iou": std_iou,
+                "mean_steps": mean_steps,
+                "std_steps": std_steps,
+                "success_rate": success_rate,
+            }
+        )
+
+    df = pd.DataFrame(all_metrics)
+    summary = df[header].agg(["mean", "std"])
+    summary.to_csv(csv_log_path)
+    logger.info(f"\n{summary}")
+
+    logger.info("Localizer full training finished.")
+
+
+def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
+
+    logger.info(
+        f"Starting localizer training (aglorithm: '{algorithm}', seed: '{seed}')."
+    )
 
     # Load metadata
     metadata_path = config.get("metadata_path", "")
     dataset_metadata = load_metadata(metadata_path)
 
+    # Create run directory if not given
+    if not run_dir:
+        run_dir = create_run_dir(config)
+
+    # TODO
+    csv_log_path = run_dir / f"{algorithm}_seed_{seed}_log.csv"
+    init_log(csv_log_path, header=["iou", "steps", "distance", "loss"])
+
     # Prepare image paths
-    image_names = get_image_names("train", dataset_metadata)
-    image_paths = get_image_paths(image_names, "../data/deeplesion/key_slices/")
+    image_names = get_image_names(split_type="train", metadata=dataset_metadata)
+    image_paths = create_image_paths(image_names, path="../data/deeplesion/key_slices/")
 
-    env = LocalizerEnv(config, image_paths, dataset_metadata)
+    # Create and seed new environment
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+    env = LocalizerEnv(config, image_paths, dataset_metadata, seed)
+    env.reset(seed=seed)
+    env.action_space.seed(seed)
     check_env(env)
-    env = Monitor(env, "logs/")
+    monitor_logs_path = run_dir / f"{algorithm}_seed_{seed}_monitor.csv"
+    env = Monitor(env, str(monitor_logs_path))
 
+    # Set hyperparameters
     train_steps = config["train"].get("train_steps", 1_000_000)
     config = config["agent"]
     learning_rate = config.get("learning_rate", 1e-4)
@@ -63,32 +127,42 @@ def train_localizer(config):
         normalize_images=False,
     )
 
-    model = DQN(
-        policy="CnnPolicy",
-        env=env,
-        exploration_initial_eps=epsilon_start,
-        exploration_final_eps=epsilon_end,
-        exploration_fraction=epsilon_decay,
-        policy_kwargs=policy_kwargs,
-        learning_rate=learning_rate,
-        n_steps=n_steps,
-        buffer_size=replay_buffer_size,
-        batch_size=batch_size,
-        tau=tau,
-        gamma=discount_factor,
-        target_update_interval=target_update_steps,
-        train_freq=train_freq,
-        verbose=1,
-        tensorboard_log=None,
-    )
+    model = None
+    if algorithm == "dqn":
+        model = DQN(
+            policy="CnnPolicy",
+            env=env,
+            seed=seed,
+            exploration_initial_eps=epsilon_start,
+            exploration_final_eps=epsilon_end,
+            exploration_fraction=epsilon_decay,
+            policy_kwargs=policy_kwargs,
+            learning_rate=learning_rate,
+            n_steps=n_steps,
+            buffer_size=replay_buffer_size,
+            batch_size=batch_size,
+            tau=tau,
+            gamma=discount_factor,
+            target_update_interval=target_update_steps,
+            train_freq=train_freq,
+            verbose=1,
+            tensorboard_log=None,
+        )
+    else:
+        raise Exception(f"There is no such algorithm as '{algorithm}'")
 
     model.learn(
         total_timesteps=train_steps,
         callback=RenderCallback(render_freq=1),
     )
-    model.save("zoom_in_dqn")
+    model_path = run_dir / f"{algorithm}_seed_{seed}_dynamic"
+    model.save(model_path)
 
-    logger.info("Localizer training finished.")
+    logger.info(
+        f"Localizer training complete (aglorithm: '{algorithm}', seed: '{seed}')."
+    )
+
+    return model, seed
 
 
 # def train_localizer_custom(config):

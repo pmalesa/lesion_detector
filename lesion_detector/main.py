@@ -5,7 +5,7 @@ from pathlib import Path
 
 from common.file_utils import load_config
 from localizer.evaluation import evaluate_localizer
-from localizer.trainer import train_localizer
+from localizer.trainer import run_complete_training, train_single_localizer
 
 
 def main():
@@ -16,6 +16,7 @@ def main():
         type=str,
         required=True,
         choices=[
+            "complete_training",
             "train_localizer",
             "eval_localizer",
             "train_classifier",
@@ -36,7 +37,7 @@ def main():
 
     # Load configuration
     config_path = ""
-    if args.task == "train_localizer":
+    if args.task in ["train_localizer", "complete_training"]:
         config_path = Path("configs/localizer_config.yaml")
         if not config_path.exists():
             print(f"Config file not found: {config_path}")
@@ -62,10 +63,15 @@ def main():
     # Run given task
     logger.info(f"Starting the task: {args.task}")
     if args.task == "train_localizer":
-        train_localizer(config)
+        algorithm = "dqn"
+        model, seed = train_single_localizer(algorithm, config)
+        evaluate_localizer(model, algorithm, config, seed)
+    elif args.task == "complete_training":
+        run_complete_training(config)
     elif args.task == "eval_localizer":
-        model_weights_path = f"{args.run_dir}/model.keras"
-        evaluate_localizer(config, model_weights_path)
+        pass
+        # model_weights_path = f"{args.run_dir}/model.keras"
+        # evaluate_localizer(config, model_weights_path)
     elif args.task == "train_classifier":
         pass
     elif args.task == "test_classifier":

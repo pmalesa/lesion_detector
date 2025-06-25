@@ -40,10 +40,10 @@ agent:
 
 train:
   train_episodes: 250 # TO REMOVE
-  train_steps: 1000000
+  train_steps: 1000000                  # Should be between 500k and 1M
   log_interval: 1                       # Print/log progress every x episodes
   save_interval: 50                     # Checkpoint model every x episodes
-  output_dir: "../runs/localizer"       # Path for saving logs, checkpoints etc.
+  output_dir: "../runs"                 # Path for saving logs, checkpoints etc.
 
 test:
   test_episodes: 20                     # TODO
