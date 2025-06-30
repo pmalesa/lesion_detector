@@ -64,8 +64,8 @@ def main():
     logger.info(f"Starting the task: {args.task}")
     if args.task == "train_localizer":
         algorithm = "dqn"
-        model, seed = train_single_localizer(algorithm, config)
-        evaluate_localizer(model, algorithm, config, seed)
+        model, run_dir, seed = train_single_localizer(algorithm, config)
+        evaluate_localizer(model, algorithm, config, seed, run_dir)
     elif args.task == "complete_training":
         run_complete_training(config)
     elif args.task == "eval_localizer":

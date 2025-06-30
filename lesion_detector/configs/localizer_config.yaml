@@ -15,7 +15,7 @@ environment:
   bbox_randomize: false
   bbox_position_shift_range: 64         # Value by which x or y coordinate of the bounding box can vary in both directions when initialized
   bbox_size_shift_range: 10             # Value by which width and height of the bounding box can vary when initialized
-  iou_threshold: 0.7  # TO REMOVE
+  iou_threshold: 0.5
 
   reward:
     alpha_1: 1.0                        # Weight of the IoU reward component
@@ -40,7 +40,7 @@ agent:
 
 train:
   train_episodes: 250 # TO REMOVE
-  train_steps: 25000                    # Should be between 500k and 1M
+  train_steps: 1000000                  # Should be between 500k and 1M
   log_interval: 1                       # Print/log progress every x episodes
   save_interval: 50                     # Checkpoint model every x episodes
   output_dir: "../runs"                 # Path for saving logs, checkpoints etc.

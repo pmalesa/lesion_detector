@@ -4,6 +4,7 @@ import numpy as np
 from common.file_utils import load_metadata
 from common.image_utils import create_image_paths, get_image_names
 from localizer.environment import LocalizerEnv
+from localizer.wrappers import CoordWrapper
 
 logger = logging.getLogger("LESION-DETECTOR")
 
@@ -32,13 +33,15 @@ def evaluate_localizer(model, algorithm: str, config, seed=42, run_dir=None):
 
     # Create and seed new environment
     render = config["environment"].get("render", False)
+    threshold = config["environment"].get("iou_threshold", 0.5)
     env = LocalizerEnv(config, image_paths, dataset_metadata, seed)
-    if render:
-        env.render()
+    env = CoordWrapper(env)
     ious, steps = [], []
 
-    for _ in image_paths[0:100]:
+    for _ in image_paths:
         obs, _ = env.reset(seed=seed)
+        if render:
+            env.render()
         done = False
         while not done:
             action, _ = model.predict(obs, deterministic=True)
@@ -53,65 +56,16 @@ def evaluate_localizer(model, algorithm: str, config, seed=42, run_dir=None):
 
     logger.info("Localizer evaluation complete.")
 
-    return np.array(ious), np.array(steps)
+    ious = np.array(ious)
+    steps = np.array(steps)
 
+    metrics = {}
+    metrics["mean_iou"] = round(ious.mean(), 4)
+    metrics["std_iou"] = round(ious.std(), 4)
+    metrics["mean_steps"] = round(steps.mean(), 4)
+    metrics["std_steps"] = round(steps.std(), 4)
+    metrics["success_rate"] = round((ious >= threshold).mean(), 4)
 
-# def evaluate_localizer_custom(config, model_weights_path: str):
-#     logger.info("Starting localizer evaluation.")
+    logger.info(f"Evaluation metrics (algorithm: '{algorithm}', seed: '{seed}'):\n  {metrics}")
 
-#     metadata_path = config.get("metadata_path", "")
-#     dataset_metadata = load_metadata(metadata_path)
-
-#     env = LocalizerEnv(config)
-#     agent = LocalizerAgent(config)
-#     agent.load_model(model_weights_path)
-#     success_iou = config["test"]["success_iou"]
-
-#     iou_values = []
-#     dist_values = []
-#     steps_values = []
-#     success_episodes = 0
-
-#     # Iterate over all test key slice images
-#     image_names = get_image_names("test", dataset_metadata)
-
-#     for i, image_name in enumerate(image_names):
-#         image_path = f"../data/deeplesion/key_slices/{image_name}"
-#         image_metadata = get_image_metadata(dataset_metadata, image_name)
-
-#         obs = env.reset(image_path, image_metadata)
-#         env.render()
-#         done = False
-#         while not done:
-#             mask = env.get_available_actions()
-#             action = agent.select_action(obs, mask, training=False)
-#             next_obs, _, done, info = env.step(action)
-#             env.render()
-#             obs = next_obs
-
-#         if info["iou"] >= success_iou:
-#             success_episodes += 1
-
-#         iou_values.append(info["iou"])
-#         dist_values.append(info["dist"])
-#         steps_values.append(info["steps"])
-
-#         logger.info(
-#             f"Image {i + 1} ({image_name}) | "
-#             f"Final IoU: {info['iou']} | "
-#             f"Total steps: {info['steps']}"
-#         )
-
-#     logger.info("Localizer evaluation finished.")
-
-#     success_rate = round(success_episodes / len(image_names), 2)
-#     average_iou = round(np.mean(iou_values), 4)
-#     average_dist = round(np.mean(dist_values), 4)
-#     average_steps = np.mean(steps_values)
-
-#     logger.info(
-#         f"\n    Success rate: {success_rate}"
-#         f"\n    Average IoU: {average_iou}"
-#         f"\n    Average distance: {average_dist}"
-#         f"\n    Average steps: {average_steps}"
-#     )
+    return metrics

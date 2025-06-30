@@ -11,10 +11,12 @@ from common.logging_utils import create_run_dir, init_log, save_config
 from localizer.callbacks import RenderCallback
 from localizer.environment import LocalizerEnv
 from localizer.evaluation import evaluate_localizer
-from localizer.networks.common import ResNet50Extractor
+from localizer.networks.common import ResNet50CoordsExtractor
+from localizer.wrappers import CoordWrapper
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.dqn import DQN
+from stable_baselines3.dqn.policies import MultiInputPolicy
 
 warnings.filterwarnings(
     "ignore",
@@ -35,7 +37,6 @@ def run_complete_training(config):
 
     seeds = [0, 42, 123, 999, 2025]
     all_metrics = []
-    threshold = 0.5
 
     # Initialize run's logs
     run_dir = create_run_dir(config)
@@ -45,21 +46,16 @@ def run_complete_training(config):
     save_config(run_dir, config)
 
     for seed in seeds:
-        model, _ = train_single_localizer("dqn", config, seed, run_dir)
-        ious, steps = evaluate_localizer(model, "dqn", config, seed, run_dir)
-
-        mean_iou, std_iou = ious.mean(), ious.std()
-        mean_steps, std_steps = steps.mean(), steps.std()
-        success_rate = (ious >= threshold).mean()
-
+        model, _, _ = train_single_localizer("dqn", config, seed, run_dir)
+        metrics = evaluate_localizer(model, "dqn", config, seed, run_dir)
         all_metrics.append(
             {
                 "seed": seed,
-                "mean_iou": mean_iou,
-                "std_iou": std_iou,
-                "mean_steps": mean_steps,
-                "std_steps": std_steps,
-                "success_rate": success_rate,
+                "mean_iou": metrics["mean_iou"],
+                "std_iou": metrics["std_iou"],
+                "mean_steps": metrics["mean_steps"],
+                "std_steps": metrics["std_steps"],
+                "success_rate": metrics["success_rate"],
             }
         )
 
@@ -74,7 +70,7 @@ def run_complete_training(config):
 def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
 
     logger.info(
-        f"Starting localizer training (aglorithm: '{algorithm}', seed: '{seed}')."
+        f"Starting localizer training (algorithm: '{algorithm}', seed: '{seed}')."
     )
 
     # Load metadata
@@ -84,10 +80,6 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     # Create run directory if not given
     if not run_dir:
         run_dir = create_run_dir(config)
-
-    # TODO
-    csv_log_path = run_dir / f"{algorithm}_seed_{seed}_log.csv"
-    init_log(csv_log_path, header=["iou", "steps", "distance", "loss"])
 
     # Prepare image paths
     image_names = get_image_names(split_type="train", metadata=dataset_metadata)
@@ -99,9 +91,14 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     random.seed(seed)
 
     env = LocalizerEnv(config, image_paths, dataset_metadata, seed)
+    env = CoordWrapper(env)
     check_env(env)
     monitor_logs_path = run_dir / f"{algorithm}_seed_{seed}_monitor.csv"
-    env = Monitor(env, str(monitor_logs_path))
+    env = Monitor(
+        env,
+        str(monitor_logs_path),
+        info_keywords=("iou", "dist")    
+    )
 
     # Set hyperparameters
     train_steps = config["train"].get("train_steps", 1_000_000)
@@ -119,8 +116,8 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     train_freq = config.get("train_freq", 1)
 
     policy_kwargs = dict(
-        features_extractor_class=ResNet50Extractor,
-        features_extractor_kwargs=dict(features_dim=2048),
+        features_extractor_class=ResNet50CoordsExtractor,
+        features_extractor_kwargs=dict(features_dim=2048 + 4),
         net_arch=[512, 256],  # Q-Network architecture
         normalize_images=False,
     )
@@ -128,7 +125,7 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     model = None
     if algorithm == "dqn":
         model = DQN(
-            policy="CnnPolicy",
+            policy=MultiInputPolicy,
             env=env,
             seed=seed,
             exploration_initial_eps=epsilon_start,
@@ -136,7 +133,7 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
             exploration_fraction=epsilon_decay,
             policy_kwargs=policy_kwargs,
             learning_rate=learning_rate,
-            n_steps=n_steps,
+            n_steps=1,
             buffer_size=replay_buffer_size,
             batch_size=batch_size,
             tau=tau,
@@ -151,7 +148,7 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
 
     model.learn(
         total_timesteps=train_steps,
-        callback=RenderCallback(render_freq=1),
+        callback=RenderCallback(render_freq=1)
     )
     model_path = run_dir / f"{algorithm}_seed_{seed}_dynamic"
     model.save(model_path)
@@ -160,78 +157,4 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
         f"Localizer training complete (aglorithm: '{algorithm}', seed: '{seed}')."
     )
 
-    return model, seed
-
-
-# def train_localizer_custom(config):
-#     logger.info("Starting localizer training (CUSTOM).")
-
-#     metadata_path = config.get("metadata_path", "")
-#     dataset_metadata = load_metadata(metadata_path)
-
-#     env = LocalizerEnv(config)
-#     agent = LocalizerAgent(config)
-#     log_interval = config["train"]["log_interval"]
-#     num_episodes = config["train"]["train_episodes"]
-
-#     # Initialize run's logs
-#     run_dir = create_run_dir(config)
-#     csv_log_path = run_dir / "training_log.csv"
-#     init_log(csv_log_path)
-#     save_config(run_dir, config)
-
-#     # Iterate over all training key slice images
-#     image_names = get_image_names("train", dataset_metadata)
-#     for i, image_name in enumerate(image_names):
-#         # image_name = image_names[1666]  # TODO
-#         image_name = "000001_03_01_088.png"
-#         logger.info(f"Loaded image {i + 1}: {image_name}.")
-#         image_path = f"../data/deeplesion/key_slices/{image_name}"
-#         agent.reset()
-
-#         for episode in range(num_episodes):
-#             image_metadata = get_image_metadata(dataset_metadata, image_name)
-#             obs = env.reset(image_path, image_metadata)
-#             env.render()
-
-#             episode_reward = 0.0
-#             losses = []
-#             done = False
-#             info = {}
-
-#             while not done:
-#                 mask = env.get_available_actions()
-#                 action = agent.select_action(obs, mask)
-#                 next_obs, reward, done, info = env.step(action)
-#                 env.render()
-#                 agent.store_experience((obs, action, reward, next_obs, done))
-#                 loss = agent.update()
-#                 episode_reward += reward
-#                 if loss:
-#                     losses.append(float(loss))
-#                 obs = next_obs
-
-#             mean_loss = round(np.mean(losses), 2) if losses else 0.0
-#             episode_reward = round(episode_reward, 2)
-#             append_log(
-#                 csv_log_path,
-#                 episode,
-#                 info["iou"],
-#                 info["dist"],
-#                 mean_loss,
-#                 episode_reward,
-#             )
-
-#             if episode % log_interval == 0:
-#                 logger.info(
-#                     f"Episode {episode + 1} | "
-#                     f"Mean Loss: {mean_loss} | "
-#                     f"Reward: {episode_reward} | "
-#                     f"Steps: {info['steps']}"
-#                 )
-
-#         break  # TODO
-
-#     # Save run's results
-#     agent.save_model(str(run_dir / "model.keras"))
-#     logger.info("Localizer training finished (CUSTOM).")
+    return model, run_dir, seed
