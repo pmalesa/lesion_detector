@@ -99,8 +99,6 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     random.seed(seed)
 
     env = LocalizerEnv(config, image_paths, dataset_metadata, seed)
-    env.reset(seed=seed)
-    env.action_space.seed(seed)
     check_env(env)
     monitor_logs_path = run_dir / f"{algorithm}_seed_{seed}_monitor.csv"
     env = Monitor(env, str(monitor_logs_path))

@@ -29,7 +29,7 @@ class LocalizerEnv(gym.Env):
         self._image_paths = image_paths
         self._dataset_metadata = dataset_metadata
         self._image_metadata = None
-        self._idx = 0
+        self._idx = -1
         self._seed = seed
 
         self._fixed_patch_length = config["agent"].get("fixed_patch_length", 128)
@@ -96,8 +96,8 @@ class LocalizerEnv(gym.Env):
 
         super().reset(seed=self._seed)
 
-        image_path = self._image_paths[self._idx]
         self._idx = (self._idx + 1) % len(self._image_paths)
+        image_path = self._image_paths[self._idx]
 
         image_name = extract_filename(image_path)
         image_metadata = get_image_metadata(self._dataset_metadata, image_name)
@@ -166,9 +166,9 @@ class LocalizerEnv(gym.Env):
         obs = self._get_observation()
         terminated = self._check_done()
         truncated = False
-        reward = (
-            self._compute_reward(final=False, timeout=terminated) if action else -10.0
-        )
+        reward = self._compute_reward(final=False, timeout=terminated)
+        if not action:
+            reward -= 10.0
         info = {}
         if terminated:
             info = {

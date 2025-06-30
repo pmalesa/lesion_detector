@@ -31,20 +31,20 @@ def evaluate_localizer(model, algorithm: str, config, seed=42, run_dir=None):
     image_paths = create_image_paths(image_names, "../data/deeplesion/key_slices/")
 
     # Create and seed new environment
+    render = config["environment"].get("render", False)
     env = LocalizerEnv(config, image_paths, dataset_metadata, seed)
-    env.reset(seed=seed)
-    env.render()
-    env.action_space.seed(seed)
-
+    if render:
+        env.render()
     ious, steps = [], []
 
-    for _ in image_paths:
+    for _ in image_paths[0:100]:
         obs, _ = env.reset(seed=seed)
         done = False
         while not done:
             action, _ = model.predict(obs, deterministic=True)
             obs, reward, terminated, truncated, info = env.step(int(action))
-            env.render()
+            if render:
+                env.render()
             done = terminated or truncated
 
         ious.append(info["iou"])

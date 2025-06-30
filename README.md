@@ -26,7 +26,12 @@ conda deactivate
 conda remove --name lesion_detector_env --all
 ```
 
-## Run training
+## Run complete training procedure
+```bash
+python main.py --task complete_training
+```
+
+## Run single localizer training
 ```bash
 python main.py --task train_localizer
 ```

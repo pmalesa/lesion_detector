@@ -36,11 +36,11 @@ agent:
   replay_buffer_size: 100000
   target_update_steps: 1000             # Number of steps after which the target network is updated
   batch_size: 32
-  fixed_patch_length: 64     # 128      # Fixed length (widht/height) of the patch (input width/height of the CNN) 
+  fixed_patch_length: 128     # 128     # Fixed length (widht/height) of the patch (input width/height of the CNN) 
 
 train:
   train_episodes: 250 # TO REMOVE
-  train_steps: 1000000                  # Should be between 500k and 1M
+  train_steps: 25000                    # Should be between 500k and 1M
   log_interval: 1                       # Print/log progress every x episodes
   save_interval: 50                     # Checkpoint model every x episodes
   output_dir: "../runs"                 # Path for saving logs, checkpoints etc.
