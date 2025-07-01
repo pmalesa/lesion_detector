@@ -2,69 +2,70 @@ import logging
 
 import numpy as np
 from common.file_utils import load_metadata
-from common.image_utils import get_image_metadata, get_image_names
-from localizer.agent import LocalizerAgent
+from common.image_utils import create_image_paths, get_image_names
 from localizer.environment import LocalizerEnv
+from localizer.wrappers import CoordWrapper
 
 logger = logging.getLogger("LESION-DETECTOR")
 
 
-def evaluate_localizer(config, model_weights_path: str):
+def evaluate_localizer(model, algorithm: str, config, seed=42, run_dir=None):
+    """
+    Runs a deterministic policy on all training
+    images on a fresh environment and returns
+    arrays of final IoUs and steps counts.
+    """
+
     logger.info("Starting localizer evaluation.")
 
+    if not run_dir:
+        logger.info("Run directory must be specified.")
+
+    # Load metadata
     metadata_path = config.get("metadata_path", "")
     dataset_metadata = load_metadata(metadata_path)
 
-    env = LocalizerEnv(config)
-    agent = LocalizerAgent(config)
-    agent.load_model(model_weights_path)
-    success_iou = config["test"]["success_iou"]
+    # Prepare image paths
+    val_image_names = get_image_names("val", dataset_metadata)
+    test_image_names = get_image_names("test", dataset_metadata)
+    image_names = val_image_names + test_image_names
+    image_paths = create_image_paths(image_names, "../data/deeplesion/key_slices/")
 
-    iou_values = []
-    dist_values = []
-    steps_values = []
-    success_episodes = 0
+    # Create and seed new environment
+    render = config["environment"].get("render", False)
+    threshold = config["environment"].get("iou_threshold", 0.5)
+    env = LocalizerEnv(config, image_paths, dataset_metadata, seed)
+    env = CoordWrapper(env)
+    ious, steps = [], []
 
-    # Iterate over all test key slice images
-    image_names = get_image_names("test", dataset_metadata)
-
-    for i, image_name in enumerate(image_names):
-        image_path = f"../data/deeplesion/key_slices/{image_name}"
-        image_metadata = get_image_metadata(dataset_metadata, image_name)
-
-        obs = env.reset(image_path, image_metadata)
-        env.render()
+    for _ in image_paths:
+        obs, _ = env.reset(seed=seed)
+        if render:
+            env.render()
         done = False
         while not done:
-            mask = env.get_available_actions()
-            action = agent.select_action(obs, mask, training=False)
-            next_obs, _, done, info = env.step(action)
-            env.render()
-            obs = next_obs
+            action, _ = model.predict(obs, deterministic=True)
+            obs, reward, terminated, truncated, info = env.step(int(action))
+            if render:
+                env.render()
+            done = terminated or truncated
 
-        if info["iou"] >= success_iou:
-            success_episodes += 1
+        ious.append(info["iou"])
+        steps.append(info["steps"])
+        logger.info(f"Episode ended — terminated={terminated} info={info}")
 
-        iou_values.append(info["iou"])
-        dist_values.append(info["dist"])
-        steps_values.append(info["steps"])
+    logger.info("Localizer evaluation complete.")
 
-        logger.info(
-            f"Image {i + 1} ({image_name}) | "
-            f"Final IoU: {info['iou']} | "
-            f"Total steps: {info['steps']}"
-        )
+    ious = np.array(ious)
+    steps = np.array(steps)
 
-    logger.info("Localizer evaluation finished.")
+    metrics = {}
+    metrics["mean_iou"] = round(ious.mean(), 4)
+    metrics["std_iou"] = round(ious.std(), 4)
+    metrics["mean_steps"] = round(steps.mean(), 4)
+    metrics["std_steps"] = round(steps.std(), 4)
+    metrics["success_rate"] = round((ious >= threshold).mean(), 4)
 
-    success_rate = round(success_episodes / len(image_names), 2)
-    average_iou = round(np.mean(iou_values), 4)
-    average_dist = round(np.mean(dist_values), 4)
-    average_steps = np.mean(steps_values)
+    logger.info(f"Evaluation metrics (algorithm: '{algorithm}', seed: '{seed}'):\n  {metrics}")
 
-    logger.info(
-        f"\n    Success rate: {success_rate}"
-        f"\n    Average IoU: {average_iou}"
-        f"\n    Average distance: {average_dist}"
-        f"\n    Average steps: {average_steps}"
-    )
+    return metrics

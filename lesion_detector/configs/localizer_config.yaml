@@ -15,7 +15,7 @@ environment:
   bbox_randomize: false
   bbox_position_shift_range: 64         # Value by which x or y coordinate of the bounding box can vary in both directions when initialized
   bbox_size_shift_range: 10             # Value by which width and height of the bounding box can vary when initialized
-  iou_threshold: 0.7
+  iou_threshold: 0.5
 
   reward:
     alpha_1: 1.0                        # Weight of the IoU reward component
@@ -26,20 +26,24 @@ environment:
 
 agent:
   learning_rate: 0.0001
-  gamma: 0.9                            # discount factor
+  gamma: 0.9                            # Discount factor
+  tau: 1.0                              # Soft-update coefficient (1.0 - hard update)
+  n_steps: 3                            # n-steps rewards (n-step TD backup)
+  train_freq: 1                         # Update frequency - determines how often we perform the gradient update (in steps)
   epsilon_start: 1.0
   epsilon_end: 0.01
-  epsilon_decay: 1500                   # Number of global steps (not episodes!) after which the epsilon will reach its minimum value
-  replay_buffer_size: 10000 # 100k
+  epsilon_decay: 0.25                   # Fraction of all timesteps after which the epsilon will reach its minimum value
+  replay_buffer_size: 100000
   target_update_steps: 1000             # Number of steps after which the target network is updated
-  batch_size: 32 # 64
-  fixed_patch_length: 64     # 128      # Fixed length (widht/height) of the patch (input width/height of the CNN) 
+  batch_size: 32
+  fixed_patch_length: 128     # 128     # Fixed length (widht/height) of the patch (input width/height of the CNN) 
 
 train:
-  train_episodes: 250
-  log_interval: 1                       # print/log progress every x episodes
-  save_interval: 50                     # chackpoint model every x episodes
-  output_dir: "../runs/localizer"       # path for saving logs, checkpoints etc.
+  train_episodes: 250 # TO REMOVE
+  train_steps: 1000000                  # Should be between 500k and 1M
+  log_interval: 1                       # Print/log progress every x episodes
+  save_interval: 50                     # Checkpoint model every x episodes
+  output_dir: "../runs"                 # Path for saving logs, checkpoints etc.
 
 test:
   test_episodes: 20                     # TODO

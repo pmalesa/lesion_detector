@@ -2,6 +2,7 @@ name: lesion_detector_env
 channels: 
   - defaults
   - conda-forge
+  - pytorch
 dependencies:
   - python=3.12.0
 
@@ -19,16 +20,24 @@ dependencies:
   # - cudatoolkit=11.8.0
   # - cudnn=9.3.0.75
 
+  # PyTorch & Torchhvision
+  - pytorch=2.5.1
+  - torchvision=0.20.1
+
+  # Gymnasium & Tensorboard
+  - gymnasium=1.0.0
+  - tensorboard=2.19.0
+
   # Include pip for pip-only packages 
   - pip
 
   # pip packages
   - pip:
+    - git+https://github.com/DLR-RM/stable-baselines3.git@master
+    - git+https://github.com/Stable-Baselines-Team/stable-baselines3-contrib.git@master # TODO - may be not needed
     - pre-commit==4.0.1
     - black==24.10.0
     - flake8==7.1.1
     - isort==5.13.2
     - mypy==1.13.0
     - pytest==8.3.4
-    - tensorflow[and-cuda]==2.17.0
-    - tensorrt==10.9.0.34
