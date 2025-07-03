@@ -2,8 +2,9 @@ import os
 from collections import OrderedDict
 
 import numpy as np
-from common.image_utils import load_image
 from numpy.typing import NDArray
+
+from common.image_utils import load_image
 
 
 class ImageCache:

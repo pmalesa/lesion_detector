@@ -1,17 +1,20 @@
-import os
 import logging
+import os
+from pathlib import Path
 
 import torch
 import torch.nn as nn
-from common.file_utils import load_metadata
 from torch.utils.data import DataLoader
-from localizer.networks.regression import BoxRegressor
-from pathlib import Path
+
 from common.dataset_loader import LesionDataset
+from common.file_utils import load_metadata
+from localizer.networks.regression import BoxRegressor
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 logger = logging.getLogger("LESION-DETECTOR")
+
+
 def train_regressor(config):
     logger.info("Starting backbone CNN fine-tuning on regression task.")
 
@@ -26,16 +29,26 @@ def train_regressor(config):
     log_interval = config.get("log_interval", 1)
 
     # Prepare dataset and loaders
-    train_dataset = LesionDataset(split="train", metadata=dataset_metadata, images_dir=images_dir)
-    val_dataset = LesionDataset(split="validation", metadata=dataset_metadata, images_dir=images_dir)
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4, pin_memory=True)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4, pin_memory=True)
+    train_dataset = LesionDataset(
+        split="train", metadata=dataset_metadata, images_dir=images_dir
+    )
+    val_dataset = LesionDataset(
+        split="validation", metadata=dataset_metadata, images_dir=images_dir
+    )
+    train_loader = DataLoader(
+        train_dataset, batch_size=32, shuffle=True, num_workers=4, pin_memory=True
+    )
+    val_loader = DataLoader(
+        val_dataset, batch_size=32, shuffle=False, num_workers=4, pin_memory=True
+    )
 
     # Prepare model, optimizer and loss criterion
     model = BoxRegressor().to(device)
     optimizer = torch.optim.Adam(
-        filter(lambda p: p.requires_grad, model.parameters()), # Optimize only unfrozen parameters
-        lr = config["learning_rate"]
+        filter(
+            lambda p: p.requires_grad, model.parameters()
+        ),  # Optimize only unfrozen parameters
+        lr=config["learning_rate"],
     )
     criterion = nn.SmoothL1Loss()
 
@@ -68,7 +81,9 @@ def train_regressor(config):
                 predictions = model(images)
                 loss = criterion(predictions, targets)
                 val_loss += loss.item()
-                logger.info(f"Validation in progress - Batch: {i + 1}/{len(val_loader)}")
+                logger.info(
+                    f"Validation in progress - Batch: {i + 1}/{len(val_loader)}"
+                )
 
         val_loss /= len(val_loader)
 
@@ -77,5 +92,5 @@ def train_regressor(config):
             best_val_loss = val_loss
             model.save_backbone(str(backbone_cnn_path))
             logger.info(f"Best backbone CNN saved to '{str(backbone_cnn_path)}'.")
-    
+
     logger.info("Finished backbone CNN fine-tuning on regression task.")

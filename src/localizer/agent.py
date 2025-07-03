@@ -3,10 +3,11 @@ import logging
 import numpy as np
 import tensorflow as tf
 from keras.optimizers import Adam
-from localizer.networks.dqn import DQN
-from localizer.utils.replay_buffer import ReplayBuffer
 from numpy.typing import NDArray
 from tensorflow.keras.models import load_model
+
+from localizer.networks.dqn import DQN
+from localizer.utils.replay_buffer import ReplayBuffer
 
 logger = logging.getLogger("LESION-DETECTOR")
 

@@ -3,9 +3,7 @@ from torchvision.models import ResNet50_Weights, resnet50
 
 
 def resnet50_backbone(
-    weights: ResNet50_Weights,
-    unfreeze_final_layer: bool = True,
-    device: str = "cuda:0"
+    weights: ResNet50_Weights, unfreeze_final_layer: bool = True, device: str = "cuda:0"
 ):
     """
     Returns a ResNet50 pretrained on ImageNet (or with custom weights),
@@ -18,12 +16,7 @@ def resnet50_backbone(
     # Replace the first conv layer and adapt to single-channel input
     w = model.conv1.weight.data
     model.conv1 = nn.Conv2d(
-        in_channels=1,
-        out_channels=64,
-        kernel_size=7,
-        stride=2,
-        padding=3,
-        bias=False
+        in_channels=1, out_channels=64, kernel_size=7, stride=2, padding=3, bias=False
     )
     model.conv1.weight.data = w.mean(dim=1, keepdim=True)
 
@@ -36,5 +29,5 @@ def resnet50_backbone(
         for name, param in model.named_parameters():
             if name.startswith("layer4"):
                 param.requires_grad = True
-    
+
     return model.to(device)

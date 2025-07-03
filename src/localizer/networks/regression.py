@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 from torchvision.models import ResNet50_Weights
+
 from localizer.networks.common import resnet50_backbone
+
 
 class BoxRegressor(nn.Module):
     """
@@ -11,10 +13,9 @@ class BoxRegressor(nn.Module):
     def __init__(self, weights: ResNet50_Weights = ResNet50_Weights.IMAGENET1K_V2):
         super().__init__()
 
-        # Initialize ResNet50 backbone 
+        # Initialize ResNet50 backbone
         self._backbone_cnn = resnet50_backbone(
-            weights=weights,
-            unfreeze_final_layer=True
+            weights=weights, unfreeze_final_layer=True
         )
 
         # Remove final FC and pooling, keeping 2048-dim features
@@ -30,10 +31,10 @@ class BoxRegressor(nn.Module):
         )
 
     def forward(self, x):
-        features = self._feature_extractor(x)           # [B, 2048, 1, 1]
-        features = features.view(features.size(0), - 1) # [B, 2048]
-        return self._regressor(features)                # [B, 4]
-    
+        features = self._feature_extractor(x)  # [B, 2048, 1, 1]
+        features = features.view(features.size(0), -1)  # [B, 2048]
+        return self._regressor(features)  # [B, 4]
+
     def save_backbone(self, path: str):
         """
         Saves only the backbone weights.

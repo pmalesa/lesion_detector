@@ -1,12 +1,20 @@
-import os, sys
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+
 import argparse
 import logging
 from pathlib import Path
+
 from src.common.file_utils import load_config
 from src.localizer.evaluation import evaluate_localizer
-from src.localizer.trainers.train_rl import run_complete_training, train_single_localizer
 from src.localizer.trainers.train_regressor import train_regressor
+from src.localizer.trainers.train_rl import (
+    run_complete_training,
+    train_single_localizer,
+)
+
 
 def main():
     # Parse command line parameters
@@ -64,11 +72,11 @@ def main():
     # Run given task
     logger.info(f"Starting the task: {args.task}")
     if args.task == "train_localizer":
-        algorithm = "dqn" # TODO
+        algorithm = "dqn"  # TODO
         model, run_dir, seed = train_single_localizer(algorithm, config)
         evaluate_localizer(model, algorithm, config, seed, run_dir)
     elif args.task == "complete_training":
-        algorithm = "dqn" # TODO
+        algorithm = "dqn"  # TODO
         run_complete_training(config, algorithm)
     elif args.task == "eval_localizer":
         pass

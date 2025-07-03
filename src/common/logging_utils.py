@@ -2,18 +2,18 @@ import csv
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import yaml
 
 
-def create_run_dir(config, algorithm: str = None) -> Path:
+def create_run_dir(config, algorithm: Optional[str] = None) -> Path:
     """
     Creates a timestamped directory for run's logs and outputs.
     """
 
     run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    run_dir = Path(config["train"]["output_dir"]) 
+    run_dir = Path(config["train"]["output_dir"])
     if algorithm is not None:
         run_dir = run_dir / algorithm
     run_dir = run_dir / run_id

@@ -1,6 +1,7 @@
 import logging
 
 import numpy as np
+
 from common.file_utils import load_metadata
 from common.image_utils import create_image_paths, get_image_names
 from localizer.environment import LocalizerEnv
@@ -55,16 +56,18 @@ def evaluate_localizer(model, algorithm: str, config, seed=42, run_dir=None):
 
     logger.info("Localizer evaluation complete.")
 
-    ious = np.array(ious)
-    steps = np.array(steps)
+    ious_arr = np.array(ious)
+    steps_arr = np.array(steps)
 
     metrics = {}
-    metrics["mean_iou"] = round(ious.mean(), 4)
-    metrics["std_iou"] = round(ious.std(), 4)
-    metrics["mean_steps"] = round(steps.mean(), 4)
-    metrics["std_steps"] = round(steps.std(), 4)
-    metrics["success_rate"] = round((ious >= threshold).mean(), 4)
+    metrics["mean_iou"] = round(ious_arr.mean(), 4)
+    metrics["std_iou"] = round(ious_arr.std(), 4)
+    metrics["mean_steps"] = round(steps_arr.mean(), 4)
+    metrics["std_steps"] = round(steps_arr.std(), 4)
+    metrics["success_rate"] = round((ious_arr >= threshold).mean(), 4)
 
-    logger.info(f"Evaluation metrics (algorithm: '{algorithm}', seed: '{seed}'):\n  {metrics}")
+    logger.info(
+        f"Evaluation metrics (algorithm: '{algorithm}', seed: '{seed}'):\n  {metrics}"
+    )
 
     return metrics
