@@ -22,14 +22,13 @@ def evaluate_localizer(model, algorithm: str, config, seed=42, run_dir=None):
         logger.info("Run directory must be specified.")
 
     # Load metadata
-    metadata_path = config.get("metadata_path", "")
-    dataset_metadata = load_metadata(metadata_path)
+    dataset_metadata = load_metadata(config.get("metadata_path", ""))
 
     # Prepare image paths
     val_image_names = get_image_names("val", dataset_metadata)
     test_image_names = get_image_names("test", dataset_metadata)
     image_names = val_image_names + test_image_names
-    image_paths = create_image_paths(image_names, "../data/deeplesion/key_slices/")
+    image_paths = create_image_paths(image_names, config.get("images_dir", ""))
 
     # Create and seed new environment
     render = config["environment"].get("render", False)

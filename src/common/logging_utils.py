@@ -7,13 +7,16 @@ from typing import List
 import yaml
 
 
-def create_run_dir(config) -> Path:
+def create_run_dir(config, algorithm: str = None) -> Path:
     """
     Creates a timestamped directory for run's logs and outputs.
     """
 
     run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    run_dir = Path(config["train"]["output_dir"]) / run_id
+    run_dir = Path(config["train"]["output_dir"]) 
+    if algorithm is not None:
+        run_dir = run_dir / algorithm
+    run_dir = run_dir / run_id
     os.makedirs(run_dir, exist_ok=True)
     return run_dir
 

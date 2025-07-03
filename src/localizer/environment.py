@@ -220,10 +220,10 @@ class LocalizerEnv(gym.Env):
 
         # Extract bounding box coordinates and draw boxes
         x, y, w, h = self._target_bbox
-        cv2.rectangle(rgb, (x, y), (x + w, y + h), (0, 0, 255), thickness=1)
+        cv2.rectangle(rgb, (x, y), (x + w, y + h), (0, 0, 255), thickness=2)
 
         x, y, w, h = self._bbox
-        cv2.rectangle(rgb, (x, y), (x + w, y + h), (0, 255, 0), thickness=1)
+        cv2.rectangle(rgb, (x, y), (x + w, y + h), (0, 255, 0), thickness=2)
 
         cv2.imshow("Rendered Image", rgb)
         cv2.waitKey(1)
@@ -345,10 +345,12 @@ class LocalizerEnv(gym.Env):
             self._image_data = cv2.resize(
                 self._image_data, (512, 512), interpolation=cv2.INTER_AREA
             )
-            x1 *= round(512 / self._image_width)
-            y1 *= round(512 / self._image_height)
-            x2 *= round(512 / self._image_width)
-            y2 *= round(512 / self._image_height)
+            scale_x = 512 / self._image_width
+            scale_y = 512 / self._image_height
+            x1 = round(x1 * scale_x)
+            y1 = round(y1 * scale_y)
+            x2 = round(x2 * scale_x)
+            y2 = round(y2 * scale_y)                                     
             self._image_height = 512
             self._image_width = 512
 

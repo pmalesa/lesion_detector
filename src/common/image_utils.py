@@ -10,7 +10,7 @@ from PIL import Image
 
 def load_image(
     path: str,
-    image_metadata: pd.DataFrame,
+    image_metadata: pd.DataFrame = None,
     hu_scale: bool = True,
     norm: bool = True,
     per_image_norm: bool = True,
@@ -105,13 +105,13 @@ def get_image_names(split_type: str, metadata: pd.DataFrame):
     return image_names
 
 
-def create_image_paths(image_names: List[str], path: str) -> List[Path]:
+def create_image_paths(image_names: List[str], dir: str) -> List[Path]:
     """
     Returns a list of image paths created from passed
-    list of image names and specified path.
+    list of image names and specified directory.
     """
 
-    directory = Path(path)
+    directory = Path(dir)
     image_paths = []
     for image_name in image_names:
         image_paths.append(directory / image_name)

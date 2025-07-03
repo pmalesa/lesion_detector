@@ -36,6 +36,11 @@ python main.py --task complete_training
 python main.py --task train_localizer
 ```
 
+## Run backbone CNN fine-tuning on regression task
+```bash
+python main.py --task train_regressor
+```
+
 ## Run evaluation
 ```bash
 python main.py --task eval_localizer --run-dir <run_path>
