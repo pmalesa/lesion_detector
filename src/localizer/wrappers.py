@@ -1,6 +1,7 @@
 import numpy as np
 from gymnasium import ObservationWrapper, spaces
 
+
 class CoordWrapper(ObservationWrapper):
     """
     Takes an environment whose observation is a single array and

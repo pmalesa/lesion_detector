@@ -1,9 +1,16 @@
+import cv2
+import pandas as pd
 import torch
 from torch.utils.data import Dataset
-import cv2
-from common.file_utils import extract_filename 
-from common.image_utils import load_image, get_image_names, create_image_paths, get_image_metadata
-import pandas as pd
+
+from common.file_utils import extract_filename
+from common.image_utils import (
+    create_image_paths,
+    get_image_metadata,
+    get_image_names,
+    load_image,
+)
+
 
 class LesionDataset(Dataset):
     """
@@ -23,10 +30,9 @@ class LesionDataset(Dataset):
         image_names = get_image_names(split, metadata)
         self._image_paths = create_image_paths(image_names, images_dir)
 
-
     def __len__(self):
         return len(self._image_paths)
-    
+
     def __getitem__(self, idx):
         image_path = self._image_paths[idx]
         image_name = extract_filename(image_path)
@@ -57,8 +63,3 @@ class LesionDataset(Dataset):
         bbox = torch.tensor([x1, y1, x2 - x1, y2 - y1], dtype=torch.float32)
 
         return image_data, bbox
-
-
-
-
-

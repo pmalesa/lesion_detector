@@ -1,10 +1,16 @@
 import logging
 import random
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
+from stable_baselines3.common.env_checker import check_env
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.dqn import DQN
+from stable_baselines3.dqn.policies import MultiInputPolicy
+
 from common.file_utils import load_metadata
 from common.image_utils import create_image_paths, get_image_names
 from common.logging_utils import create_run_dir, init_log, save_config
@@ -13,10 +19,6 @@ from localizer.environment import LocalizerEnv
 from localizer.evaluation import evaluate_localizer
 from localizer.networks.common import ResNet50CoordsExtractor
 from localizer.wrappers import CoordWrapper
-from stable_baselines3.common.env_checker import check_env
-from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.dqn import DQN
-from stable_baselines3.dqn.policies import MultiInputPolicy
 
 warnings.filterwarnings(
     "ignore",
@@ -85,6 +87,7 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     # Prepare image paths
     image_names = get_image_names(split_type="train", metadata=dataset_metadata)
     image_paths = create_image_paths(image_names, config.get("images_dir", ""))
+    # TODO - Add validation set here
 
     # Create and seed new environment
     torch.manual_seed(seed)
@@ -95,18 +98,14 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     env = CoordWrapper(env)
     check_env(env)
     monitor_logs_path = run_dir / f"{algorithm}_seed_{seed}_monitor.csv"
-    env = Monitor(
-        env,
-        str(monitor_logs_path),
-        info_keywords=("iou", "dist")    
-    )
+    env = Monitor(env, str(monitor_logs_path), info_keywords=("iou", "dist"))
 
     # Set hyperparameters
     train_steps = config["train"].get("train_steps", 1_000_000)
-    weights_path = config.get("backbone_cnn_path", "")
+    weights_path = Path(config.get("backbone_cnn_path", ""))
     config = config["agent"]
     learning_rate = config.get("learning_rate", 1e-4)
-    n_steps = config.get("n_steps", 3)
+    # n_steps = config.get("n_steps", 3)
     discount_factor = config.get("discount_factor", 0.9)
     tau = config.get("tau", 1.0)
     epsilon_start = config.get("epsilon_start", 1.0)
@@ -122,7 +121,7 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
         features_extractor_kwargs={
             "features_dim": 2048 + 4,
             "weights_path": weights_path,
-            "device": device
+            "device": device,
         },
         net_arch=[512, 256],  # Q-Network architecture
         normalize_images=False,
@@ -152,10 +151,7 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     else:
         raise Exception(f"There is no such algorithm as '{algorithm}'")
 
-    model.learn(
-        total_timesteps=train_steps,
-        callback=RenderCallback(render_freq=1)
-    )
+    model.learn(total_timesteps=train_steps, callback=RenderCallback(render_freq=1))
     model_path = run_dir / f"{algorithm}_seed_{seed}_dynamic"
     model.save(model_path)
 

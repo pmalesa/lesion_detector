@@ -14,6 +14,8 @@ repos:
         args: 
           - --max-line-length=100
           - --ignore=E203
+          # ignore E402 only in main.py
+          - --per-file-ignores=main.py:E402
 
   # Import sorting
   - repo: https://github.com/PyCQA/isort

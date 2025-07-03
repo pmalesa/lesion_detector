@@ -1,5 +1,6 @@
 import torch
 
+
 def show_available_devices():
     print(f"Cuda available: {torch.cuda.is_available()}")
     if torch.cuda.is_available():

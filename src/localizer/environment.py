@@ -4,11 +4,12 @@ import cv2
 import gymnasium as gym
 import numpy as np
 import pandas as pd
+from gymnasium import spaces
+from numpy.typing import NDArray
+
 from common.file_utils import extract_filename
 from common.image_utils import get_image_metadata, load_image
 from common.metrics import dist, iou
-from gymnasium import spaces
-from numpy.typing import NDArray
 
 
 class LocalizerEnv(gym.Env):
@@ -350,7 +351,7 @@ class LocalizerEnv(gym.Env):
             x1 = round(x1 * scale_x)
             y1 = round(y1 * scale_y)
             x2 = round(x2 * scale_x)
-            y2 = round(y2 * scale_y)                                     
+            y2 = round(y2 * scale_y)
             self._image_height = 512
             self._image_width = 512
 
