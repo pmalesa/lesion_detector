@@ -86,8 +86,13 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
 
     # Prepare image paths
     image_names = get_image_names(split_type="train", metadata=dataset_metadata)
+    image_names_val = get_image_names(
+        split_type="validation", metadata=dataset_metadata
+    )
     image_paths = create_image_paths(image_names, config.get("images_dir", ""))
-    # TODO - Add validation set here
+    image_paths_val = create_image_paths(image_names_val, config.get("images_dir", ""))
+    image_names.extend(image_names_val)
+    image_paths.extend(image_paths_val)
 
     # Create and seed new environment
     torch.manual_seed(seed)

@@ -273,27 +273,16 @@ class LocalizerEnv(gym.Env):
 
     def _compute_reward(self, final: bool = False, timeout: bool = False) -> float:
         """
-        Computes the reward (including bonus), that includes three components:
-        * Component proportional to the IoU metric change,
-        * Component inversely proportional to the distance change between centers,
-        * Step penalty component.
+        Computes the reward (including bonus), that is based on
+        the IoU metric (+1/-1) and step penalty.
         """
 
-        iou_val, dist_val = self._get_iou(), self._get_distance()
-
-        # Compute the main reward
+        iou_val = self._get_iou()
         delta_iou_reward = 0.0
         if self._prev_iou:
-            delta_iou_reward = self._alpha_2 * (iou_val - self._prev_iou)
+            delta_iou_reward = iou_val - self._prev_iou
 
-        delta_dist_reward = 0.0
-        if self._prev_dist:
-            delta_dist_reward = self._beta * (self._prev_dist - dist_val)
-
-        self._prev_iou = iou_val
-        self._prev_dist = dist_val
-
-        reward = delta_iou_reward + delta_dist_reward + self._step_penalty
+        reward = np.sign(delta_iou_reward) + self._step_penalty
 
         # Compute the bonus component
         if final:
