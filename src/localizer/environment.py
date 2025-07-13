@@ -58,8 +58,9 @@ class LocalizerEnv(gym.Env):
         self._alpha_1 = self._config.get("alpha_1", 5.0)
         self._alpha_2 = self._config.get("alpha_2", 2.0)
         self._beta = self._config.get("beta", 2.0)
-        self._step_penalty = self._config.get("step_penalty", -1.0)
-        self._iou_final_reward = self._config.get("iou_final_reward", 20.0)
+        self._step_penalty = self._config.get("step_penalty", 0.05)
+        self._iou_final_reward = self._config.get("iou_final_reward", 10.0)
+        self._illegal_action_penalty = self._config.get("illegal_action_penalty", 2.0)
 
         self._prev_dist = None
         self._prev_iou = None
@@ -167,9 +168,10 @@ class LocalizerEnv(gym.Env):
         obs = self._get_observation()
         terminated = self._check_done()
         truncated = False
-        reward = self._compute_reward(final=False, timeout=terminated)
-        if not action:
-            reward -= 10.0
+        action_valid = True if action else False
+        reward = self._compute_reward(
+            action_valid=action_valid, final=False, timeout=terminated
+        )
         info = {}
         if terminated:
             info = {
@@ -271,18 +273,25 @@ class LocalizerEnv(gym.Env):
         ).astype(np.float32)
         return np.clip(resized, 0.0, 1.0)
 
-    def _compute_reward(self, final: bool = False, timeout: bool = False) -> float:
+    def _compute_reward(
+        self, action_valid: bool = True, final: bool = False, timeout: bool = False
+    ) -> float:
         """
         Computes the reward (including bonus), that is based on
         the IoU metric (+1/-1) and step penalty.
         """
 
         iou_val = self._get_iou()
-        delta_iou_reward = 0.0
-        if self._prev_iou:
-            delta_iou_reward = iou_val - self._prev_iou
+        reward = 0.0
+        if action_valid:
+            delta_iou_reward = 0.0
+            if self._prev_iou:
+                delta_iou_reward = iou_val - self._prev_iou
+            reward = np.sign(delta_iou_reward)
+        else:
+            reward -= self._illegal_action_penalty
 
-        reward = np.sign(delta_iou_reward) + self._step_penalty
+        reward -= self._step_penalty
 
         # Compute the bonus component
         if final:

@@ -51,7 +51,7 @@ def run_complete_training(config, algorithm: str):
 
     for seed in seeds:
         model, _, _ = train_single_localizer("dqn", config, seed, run_dir)
-        metrics = evaluate_localizer(model, "dqn", config, seed, run_dir)
+        metrics = evaluate_localizer(model, "dqn", config, seed)
         all_metrics.append(
             {
                 "seed": seed,
@@ -83,6 +83,7 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     # Create run directory if not given
     if not run_dir:
         run_dir = create_run_dir(config, algorithm)
+    save_config(run_dir, config)
 
     # Prepare image paths
     image_names = get_image_names(split_type="train", metadata=dataset_metadata)
@@ -156,6 +157,7 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     else:
         raise Exception(f"There is no such algorithm as '{algorithm}'")
 
+    # ADD CALLBACK TO SAVE CHECKPOINTS EVERY 10k steps
     model.learn(total_timesteps=train_steps, callback=RenderCallback(render_freq=1))
     model_path = run_dir / f"{algorithm}_seed_{seed}_dynamic"
     model.save(model_path)
@@ -165,4 +167,4 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     )
     logger.info(f"Localizer model saved to '{run_dir}'.")
 
-    return model, run_dir, seed
+    return model_path, seed

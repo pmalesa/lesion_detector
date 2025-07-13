@@ -43,7 +43,7 @@ python main.py --task train_regressor
 
 ## Run evaluation
 ```bash
-python main.py --task eval_localizer --run-dir <run_path>
+python main.py --task eval_localizer --model-path <model-weights-path>
 ```
 
 ## Plot results
