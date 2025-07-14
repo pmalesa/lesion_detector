@@ -51,7 +51,7 @@ class LocalizerEnv(gym.Env):
         self._bbox_size_shift_range = self._config.get("bbox_size_shift_range", 10.0)
         self._move_step_factor = self._config.get("bbox_move_step_factor", 0.1)
         self._resize_factor = self._config.get("bbox_resize_factor", 0.1)
-        # self._iou_threshold = self._config.get("iou_threshold", 0.7) # TODO - UNUSED
+        self.iou_terminate_threshold = self._config.get("iou_terminate_threshold", 0.8)
 
         # Reward function weights
         self._config = self._config["reward"]
@@ -283,6 +283,7 @@ class LocalizerEnv(gym.Env):
 
         iou_val = self._get_iou()
         reward = 0.0
+        step_penalty = self._step_penalty if iou_val < 0.5 else 5 * self._step_penalty
         if action_valid:
             delta_iou_reward = 0.0
             if self._prev_iou:
@@ -291,9 +292,11 @@ class LocalizerEnv(gym.Env):
         else:
             reward -= self._illegal_action_penalty
 
-        reward -= self._step_penalty
+        reward -= step_penalty
 
         # Compute the bonus component
+        if iou_val >= 0.8:
+            final = True
         if final:
             if iou_val >= 0.75:
                 reward += (
@@ -303,8 +306,8 @@ class LocalizerEnv(gym.Env):
                 reward += (
                     0.5 * self._iou_final_reward if timeout else self._iou_final_reward
                 )
-            else:
-                reward -= self._iou_final_reward
+            # else:
+            #     reward -= self._iou_final_reward
 
         return reward
 
@@ -395,7 +398,10 @@ class LocalizerEnv(gym.Env):
         Checks whether the episode should end.
         """
 
-        return self._current_step >= self._max_steps
+        condition_1 = self._current_step >= self._max_steps
+        condition_2 = self._get_iou() >= self.iou_terminate_threshold
+
+        return bool(condition_1 or condition_2)
 
     def _normalize_bbox(self, bbox: np.ndarray) -> NDArray[np.float32]:
         """

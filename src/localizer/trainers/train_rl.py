@@ -50,8 +50,8 @@ def run_complete_training(config, algorithm: str):
     save_config(run_dir, config)
 
     for seed in seeds:
-        model, _, _ = train_single_localizer("dqn", config, seed, run_dir)
-        metrics = evaluate_localizer(model, "dqn", config, seed)
+        model_path, _ = train_single_localizer("dqn", config, seed, run_dir)
+        metrics = evaluate_localizer(model_path, "dqn", config, seed)
         all_metrics.append(
             {
                 "seed": seed,
@@ -72,7 +72,6 @@ def run_complete_training(config, algorithm: str):
 
 
 def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
-
     logger.info(
         f"Starting localizer training (algorithm: '{algorithm}', seed: '{seed}')."
     )
@@ -153,6 +152,7 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
             train_freq=train_freq,
             verbose=1,
             tensorboard_log=None,
+            device=device,
         )
     else:
         raise Exception(f"There is no such algorithm as '{algorithm}'")
