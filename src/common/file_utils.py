@@ -15,5 +15,10 @@ def extract_filename(path: str):
     return full_path.name
 
 
+def extract_directory(path: str):
+    full_path = Path(path)
+    return full_path.parent
+
+
 def load_metadata(path: str) -> pd.DataFrame:
     return pd.read_csv(path)

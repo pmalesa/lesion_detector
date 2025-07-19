@@ -51,15 +51,16 @@ class LocalizerEnv(gym.Env):
         self._bbox_size_shift_range = self._config.get("bbox_size_shift_range", 10.0)
         self._move_step_factor = self._config.get("bbox_move_step_factor", 0.1)
         self._resize_factor = self._config.get("bbox_resize_factor", 0.1)
-        # self._iou_threshold = self._config.get("iou_threshold", 0.7) # TODO - UNUSED
+        self.iou_terminate_threshold = self._config.get("iou_terminate_threshold", 0.8)
 
         # Reward function weights
         self._config = self._config["reward"]
         self._alpha_1 = self._config.get("alpha_1", 5.0)
         self._alpha_2 = self._config.get("alpha_2", 2.0)
         self._beta = self._config.get("beta", 2.0)
-        self._step_penalty = self._config.get("step_penalty", -1.0)
-        self._iou_final_reward = self._config.get("iou_final_reward", 20.0)
+        self._step_penalty = self._config.get("step_penalty", 0.05)
+        self._iou_final_reward = self._config.get("iou_final_reward", 10.0)
+        self._illegal_action_penalty = self._config.get("illegal_action_penalty", 2.0)
 
         self._prev_dist = None
         self._prev_iou = None
@@ -167,9 +168,10 @@ class LocalizerEnv(gym.Env):
         obs = self._get_observation()
         terminated = self._check_done()
         truncated = False
-        reward = self._compute_reward(final=False, timeout=terminated)
-        if not action:
-            reward -= 10.0
+        action_valid = True if action else False
+        reward = self._compute_reward(
+            action_valid=action_valid, final=False, timeout=terminated
+        )
         info = {}
         if terminated:
             info = {
@@ -271,31 +273,30 @@ class LocalizerEnv(gym.Env):
         ).astype(np.float32)
         return np.clip(resized, 0.0, 1.0)
 
-    def _compute_reward(self, final: bool = False, timeout: bool = False) -> float:
+    def _compute_reward(
+        self, action_valid: bool = True, final: bool = False, timeout: bool = False
+    ) -> float:
         """
-        Computes the reward (including bonus), that includes three components:
-        * Component proportional to the IoU metric change,
-        * Component inversely proportional to the distance change between centers,
-        * Step penalty component.
+        Computes the reward (including bonus), that is based on
+        the IoU metric (+1/-1) and step penalty.
         """
 
-        iou_val, dist_val = self._get_iou(), self._get_distance()
+        iou_val = self._get_iou()
+        reward = 0.0
+        step_penalty = self._step_penalty if iou_val < 0.5 else 5 * self._step_penalty
+        if action_valid:
+            delta_iou_reward = 0.0
+            if self._prev_iou:
+                delta_iou_reward = iou_val - self._prev_iou
+            reward = np.sign(delta_iou_reward)
+        else:
+            reward -= self._illegal_action_penalty
 
-        # Compute the main reward
-        delta_iou_reward = 0.0
-        if self._prev_iou:
-            delta_iou_reward = self._alpha_2 * (iou_val - self._prev_iou)
-
-        delta_dist_reward = 0.0
-        if self._prev_dist:
-            delta_dist_reward = self._beta * (self._prev_dist - dist_val)
-
-        self._prev_iou = iou_val
-        self._prev_dist = dist_val
-
-        reward = delta_iou_reward + delta_dist_reward + self._step_penalty
+        reward -= step_penalty
 
         # Compute the bonus component
+        if iou_val >= 0.8:
+            final = True
         if final:
             if iou_val >= 0.75:
                 reward += (
@@ -305,8 +306,8 @@ class LocalizerEnv(gym.Env):
                 reward += (
                     0.5 * self._iou_final_reward if timeout else self._iou_final_reward
                 )
-            else:
-                reward -= self._iou_final_reward
+            # else:
+            #     reward -= self._iou_final_reward
 
         return reward
 
@@ -397,7 +398,10 @@ class LocalizerEnv(gym.Env):
         Checks whether the episode should end.
         """
 
-        return self._current_step >= self._max_steps
+        condition_1 = self._current_step >= self._max_steps
+        condition_2 = self._get_iou() >= self.iou_terminate_threshold
+
+        return bool(condition_1 or condition_2)
 
     def _normalize_bbox(self, bbox: np.ndarray) -> NDArray[np.float32]:
         """

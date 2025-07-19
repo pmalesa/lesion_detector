@@ -7,7 +7,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from src.common.file_utils import load_config
+from src.common.file_utils import extract_directory, load_config
 from src.localizer.evaluation import evaluate_localizer
 from src.localizer.trainers.train_regressor import train_regressor
 from src.localizer.trainers.train_rl import (
@@ -34,15 +34,15 @@ def main():
         help="Specify which task to run/",
     )
     parser.add_argument(
-        "--run-dir",
+        "--model-path",
         type=str,
         required=False,
         help="Path to the trained model directory (required for evaluation)",
     )
     args = parser.parse_args()
 
-    if args.task == "eval_localizer" and not args.run_dir:
-        parser.error("--run-dir is required when --task=eval_localizer")
+    if args.task == "eval_localizer" and not args.model_path:
+        parser.error("--model-path is required when --task=eval_localizer")
 
     # Load configuration
     config_path = ""
@@ -52,7 +52,8 @@ def main():
             print(f"Config file not found: {config_path}")
             sys.exit(1)
     else:
-        config_path = Path(f"{args.run_dir}/config.yaml")
+        run_dir = extract_directory(args.model_path)
+        config_path = Path(f"{run_dir}/config.yaml")
         if not config_path.exists():
             print(f"Config file not found: {config_path}")
             sys.exit(1)
@@ -73,15 +74,16 @@ def main():
     logger.info(f"Starting the task: {args.task}")
     if args.task == "train_localizer":
         algorithm = "dqn"  # TODO
-        model, run_dir, seed = train_single_localizer(algorithm, config)
-        evaluate_localizer(model, algorithm, config, seed, run_dir)
+        model_path, seed = train_single_localizer(algorithm, config)
+        evaluate_localizer(model_path, algorithm, config, seed)
     elif args.task == "complete_training":
         algorithm = "dqn"  # TODO
         run_complete_training(config, algorithm)
     elif args.task == "eval_localizer":
-        pass
-        # model_weights_path = f"{args.run_dir}/model.keras"
-        # evaluate_localizer(config, model_weights_path)
+        algorithm = "dqn"  # TODO
+        model_path = args.model_path
+        seed = 42
+        evaluate_localizer(model_path, algorithm, config, seed)
     elif args.task == "train_regressor":
         train_regressor(config)
     elif args.task == "train_classifier":

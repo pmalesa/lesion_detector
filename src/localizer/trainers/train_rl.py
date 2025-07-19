@@ -50,8 +50,8 @@ def run_complete_training(config, algorithm: str):
     save_config(run_dir, config)
 
     for seed in seeds:
-        model, _, _ = train_single_localizer("dqn", config, seed, run_dir)
-        metrics = evaluate_localizer(model, "dqn", config, seed, run_dir)
+        model_path, _ = train_single_localizer("dqn", config, seed, run_dir)
+        metrics = evaluate_localizer(model_path, "dqn", config, seed)
         all_metrics.append(
             {
                 "seed": seed,
@@ -72,7 +72,6 @@ def run_complete_training(config, algorithm: str):
 
 
 def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
-
     logger.info(
         f"Starting localizer training (algorithm: '{algorithm}', seed: '{seed}')."
     )
@@ -83,11 +82,17 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     # Create run directory if not given
     if not run_dir:
         run_dir = create_run_dir(config, algorithm)
+    save_config(run_dir, config)
 
     # Prepare image paths
     image_names = get_image_names(split_type="train", metadata=dataset_metadata)
+    image_names_val = get_image_names(
+        split_type="validation", metadata=dataset_metadata
+    )
     image_paths = create_image_paths(image_names, config.get("images_dir", ""))
-    # TODO - Add validation set here
+    image_paths_val = create_image_paths(image_names_val, config.get("images_dir", ""))
+    image_names.extend(image_names_val)
+    image_paths.extend(image_paths_val)
 
     # Create and seed new environment
     torch.manual_seed(seed)
@@ -147,10 +152,12 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
             train_freq=train_freq,
             verbose=1,
             tensorboard_log=None,
+            device=device,
         )
     else:
         raise Exception(f"There is no such algorithm as '{algorithm}'")
 
+    # ADD CALLBACK TO SAVE CHECKPOINTS EVERY 10k steps
     model.learn(total_timesteps=train_steps, callback=RenderCallback(render_freq=1))
     model_path = run_dir / f"{algorithm}_seed_{seed}_dynamic"
     model.save(model_path)
@@ -160,4 +167,4 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     )
     logger.info(f"Localizer model saved to '{run_dir}'.")
 
-    return model, run_dir, seed
+    return model_path, seed
