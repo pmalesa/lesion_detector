@@ -3,9 +3,13 @@ import random
 import warnings
 from pathlib import Path
 
+import gymnasium as gym
 import numpy as np
 import pandas as pd
 import torch
+from sb3_contrib import MaskablePPO
+from sb3_contrib.common.maskable.policies import MaskableActorCriticCnnPolicy
+from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.dqn import DQN
@@ -17,7 +21,7 @@ from common.logging_utils import create_run_dir, init_log, save_config
 from localizer.callbacks import RenderCallback
 from localizer.environment import LocalizerEnv
 from localizer.evaluation import evaluate_localizer
-from localizer.networks.common import ResNet50CoordsExtractor
+from localizer.networks.common import ResNet50CoordsExtractor, ResNet50Extractor
 from localizer.wrappers import CoordWrapper
 
 warnings.filterwarnings(
@@ -34,6 +38,10 @@ warnings.filterwarnings(
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 logger = logging.getLogger("LESION-DETECTOR")
+
+
+def mask_fn(env: gym.Env) -> np.ndarray:
+    return env.get_available_actions()
 
 
 def run_complete_training(config, algorithm: str):
@@ -99,41 +107,37 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
     np.random.seed(seed)
     random.seed(seed)
 
+    model = None
     env = LocalizerEnv(config, image_paths, dataset_metadata, seed)
-    env = CoordWrapper(env)
-    check_env(env)
-    monitor_logs_path = run_dir / f"{algorithm}_seed_{seed}_monitor.csv"
-    env = Monitor(env, str(monitor_logs_path), info_keywords=("iou", "dist"))
 
     # Set hyperparameters
     train_steps = config["train"].get("train_steps", 1_000_000)
     weights_path = Path(config.get("backbone_cnn_path", ""))
-    config = config["agent"]
-    learning_rate = config.get("learning_rate", 1e-4)
-    # n_steps = config.get("n_steps", 3)
-    discount_factor = config.get("discount_factor", 0.9)
-    tau = config.get("tau", 1.0)
-    epsilon_start = config.get("epsilon_start", 1.0)
-    epsilon_end = config.get("epsilon_end", 0.01)
-    epsilon_decay = config.get("epsilon_decay", 0.25)
-    replay_buffer_size = config.get("replay_buffer_size", 100_000)
-    batch_size = config.get("batch_size", 32)
-    target_update_steps = config.get("target_update_steps", 1000)
-    train_freq = config.get("train_freq", 1)
+    agent_config = config["agent"]
+    learning_rate = agent_config.get("learning_rate", 1e-4)
+    # n_steps = agent_config.get("n_steps", 3)
+    discount_factor = agent_config.get("discount_factor", 0.9)
+    tau = agent_config.get("tau", 1.0)
+    epsilon_start = agent_config.get("epsilon_start", 1.0)
+    epsilon_end = agent_config.get("epsilon_end", 0.01)
+    epsilon_decay = agent_config.get("epsilon_decay", 0.25)
+    replay_buffer_size = agent_config.get("replay_buffer_size", 100_000)
+    batch_size = agent_config.get("batch_size", 32)
+    target_update_steps = agent_config.get("target_update_steps", 1000)
+    train_freq = agent_config.get("train_freq", 1)
 
-    policy_kwargs = dict(
-        features_extractor_class=ResNet50CoordsExtractor,
-        features_extractor_kwargs={
-            "features_dim": 2048 + 4,
-            "weights_path": weights_path,
-            "device": device,
-        },
-        net_arch=[512, 256],  # Q-Network architecture
-        normalize_images=False,
-    )
-
-    model = None
     if algorithm == "dqn":
+        env = CoordWrapper(env)
+        policy_kwargs = dict(
+            features_extractor_class=ResNet50CoordsExtractor,
+            features_extractor_kwargs={
+                "features_dim": 2048 + 4,  # ResNet50 output size + 4 bbox coords
+                "weights_path": weights_path,
+                "device": device,
+            },
+            net_arch=[512, 256],  # Q-Network architecture
+            normalize_images=False,
+        )
         model = DQN(
             policy=MultiInputPolicy,
             env=env,
@@ -154,10 +158,42 @@ def train_single_localizer(algorithm: str, config, seed=42, run_dir=None):
             tensorboard_log=None,
             device=device,
         )
+    elif algorithm == "ppo":
+        env = LocalizerEnv(config, image_paths, dataset_metadata, seed)
+        env = ActionMasker(env, mask_fn)
+        policy_kwargs = dict(
+            features_extractor_class=ResNet50Extractor,
+            features_extractor_kwargs={
+                "features_dim": 2048,
+                "weights_path": weights_path,
+                "device": device,
+            },
+            net_arch=[512, 256],  # Q-Network architecture
+            normalize_images=False,
+        )
+        model = MaskablePPO(
+            policy=MaskableActorCriticCnnPolicy,
+            env=env,
+            seed=seed,
+            policy_kwargs=policy_kwargs,
+            learning_rate=learning_rate,
+            ent_coef=1e-3,
+            n_steps=256,
+            n_epochs=4,
+            batch_size=batch_size,
+            gamma=discount_factor,
+            verbose=1,
+            tensorboard_log=None,
+            device=device,
+        )
     else:
         raise Exception(f"There is no such algorithm as '{algorithm}'")
 
-    # ADD CALLBACK TO SAVE CHECKPOINTS EVERY 10k steps
+    check_env(env)
+    monitor_logs_path = run_dir / f"{algorithm}_seed_{seed}_monitor.csv"
+    env = Monitor(env, str(monitor_logs_path), info_keywords=("iou", "dist"))
+
+    # TODO - ADD CALLBACK TO SAVE CHECKPOINTS EVERY 10k steps
     model.learn(total_timesteps=train_steps, callback=RenderCallback(render_freq=1))
     model_path = run_dir / f"{algorithm}_seed_{seed}_dynamic"
     model.save(model_path)

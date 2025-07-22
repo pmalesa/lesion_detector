@@ -34,6 +34,9 @@ def main():
         help="Specify which task to run/",
     )
     parser.add_argument(
+        "--algorithm", type=str, required=True, help="Name of the algorithm (dqn/ppo)"
+    )
+    parser.add_argument(
         "--model-path",
         type=str,
         required=False,
@@ -73,17 +76,12 @@ def main():
     # Run given task
     logger.info(f"Starting the task: {args.task}")
     if args.task == "train_localizer":
-        algorithm = "dqn"  # TODO
-        model_path, seed = train_single_localizer(algorithm, config)
-        evaluate_localizer(model_path, algorithm, config, seed)
+        model_path, seed = train_single_localizer(args.algorithm, config)
+        evaluate_localizer(model_path, args.algorithm, config, seed)
     elif args.task == "complete_training":
-        algorithm = "dqn"  # TODO
-        run_complete_training(config, algorithm)
+        run_complete_training(config, args.algorithm)
     elif args.task == "eval_localizer":
-        algorithm = "dqn"  # TODO
-        model_path = args.model_path
-        seed = 42
-        evaluate_localizer(model_path, algorithm, config, seed)
+        evaluate_localizer(args.model_path, args.algorithm, config, 42)
     elif args.task == "train_regressor":
         train_regressor(config)
     elif args.task == "train_classifier":
