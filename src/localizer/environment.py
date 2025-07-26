@@ -30,10 +30,11 @@ class LocalizerEnv(gym.Env):
         self._image_paths = image_paths
         self._dataset_metadata = dataset_metadata
         self._image_metadata = None
-        self._idx = -1
+        self._image_idx = 0
         self._seed = seed
 
         self._fixed_patch_length = config["agent"].get("fixed_patch_length", 128)
+        self._n_train_images = config["train"].get("n_train_images", 300)
         self._config = config["environment"]
         self._render = self._config.get("render", False)
 
@@ -44,7 +45,7 @@ class LocalizerEnv(gym.Env):
         self._bbox_min_length = self._config.get("bbox_min_length", 10)
         self._bbox_max_length = self._config.get("bbox_max_length", 64)
         self._bbox_max_aspect_ratio = self._config.get("bbox_max_aspect_ratio", 3.0)
-        self._bbox_randomize = self._config.get("bbox_randomize", True)
+        self._bbox_randomize = self._config.get("bbox_randomize", False)
         self._bbox_position_shift_range = self._config.get(
             "bbox_position_shift_range", 50.0
         )
@@ -60,6 +61,7 @@ class LocalizerEnv(gym.Env):
         self._beta = self._config.get("beta", 2.0)
         self._step_penalty = self._config.get("step_penalty", 0.05)
         self._iou_final_reward = self._config.get("iou_final_reward", 10.0)
+        self._iout_threshold = self._config.get("iou_threshold", 0.5)
         self._illegal_action_penalty = self._config.get("illegal_action_penalty", 2.0)
 
         self._prev_dist = None
@@ -98,8 +100,8 @@ class LocalizerEnv(gym.Env):
 
         super().reset(seed=self._seed)
 
-        self._idx = (self._idx + 1) % len(self._image_paths)
-        image_path = self._image_paths[self._idx]
+        self._image_idx = (self._image_idx + 1) % self._n_train_images
+        image_path = self._image_paths[self._image_idx]
 
         image_name = extract_filename(image_path)
         image_metadata = get_image_metadata(self._dataset_metadata, image_name)
@@ -298,11 +300,11 @@ class LocalizerEnv(gym.Env):
         if iou_val >= 0.8:
             final = True
         if final:
-            if iou_val >= 0.75:
+            if iou_val >= 1.5 * self._iout_threshold:
                 reward += (
                     self._iou_final_reward if timeout else 2 * self._iou_final_reward
                 )
-            elif iou_val >= 0.5:
+            elif iou_val >= self._iout_threshold:
                 reward += (
                     0.5 * self._iou_final_reward if timeout else self._iou_final_reward
                 )
