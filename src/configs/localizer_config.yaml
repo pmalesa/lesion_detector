@@ -11,7 +11,7 @@ regression:
 
 environment:
   render: false
-  max_steps: 100                        # Max steps the agent can take before the episode ends
+  max_steps: 30                         # Max steps the agent can take before the episode ends
   bbox_move_step_factor: 0.1
   bbox_resize_factor: 0.1
   initial_bbox_width: 512
@@ -27,12 +27,9 @@ environment:
   iou_terminate_threshold: 0.8          # Value of IoU after which the episode is terminated automatically
 
   reward:
-    alpha_1: 1.0                        # (TODO - REMOVE) Weight of the IoU reward component
-    alpha_2: 5.0                        # (TODO - REMOVE) Weight of the delta IoU reward component
-    beta: 3.0                           # (TODO - REMOVE) Weight of the delta distance reward component
     step_penalty: 0.1                   # (0.05 - 0.1)
     iou_final_reward: 20.0              # Additional, big reward on finishing step, when IoU >= threshold
-    illegal_action_penalty: 2.0         # Penalty for choosing an illegal action (-1.0 or -2.0) 
+    illegal_action_penalty: 5.0         # Penalty for choosing an illegal action (-1.0 or -5.0) 
 
 agent:
   learning_rate: 0.0001
@@ -40,16 +37,17 @@ agent:
   tau: 1.0                              # Soft-update coefficient (1.0 - hard update)
   n_steps: 3                            # n-steps rewards (n-step TD backup)
   train_freq: 1                         # Update frequency - determines how often we perform the gradient update (in steps)
-  epsilon_start: 1.0
+  epsilon_start: 0.75
   epsilon_end: 0.01
-  epsilon_decay: 0.25                   # Fraction of all timesteps after which the epsilon will reach its minimum value
+  epsilon_decay: 0.02                   # Fraction of all timesteps after which the epsilon will reach its minimum value
   replay_buffer_size: 100000
   target_update_steps: 1000             # Number of steps after which the target network is updated
   batch_size: 32
   fixed_patch_length: 224     # 128     # Fixed length (widht/height) of the patch (input width/height of the CNN) 
 
 train:
-  train_episodes: 250 # TO REMOVE
+  episodes_per_image: 40                # Number of episodes per image (~epochs)
+  n_train_images: 300                     # Total number of images used for training
   train_steps: 1000000                  # Should be between 500k and 1M
   log_interval: 1                       # Print/log progress every x episodes
   save_interval: 50                     # Checkpoint model every x episodes
