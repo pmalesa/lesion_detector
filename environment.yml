@@ -11,6 +11,9 @@ dependencies:
   - matplotlib=3.9.3
   - pandas=2.2.3
 
+  # Jupyter Notebooks
+  - jupyter=1.1.1
+
   # Addtitional packages
   - pyyaml=6.0.2
   - types-PyYAML=6.0.12
