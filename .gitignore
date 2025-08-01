@@ -2,3 +2,7 @@ __pycache__/
 runs/
 data/deeplesion/
 .vscode
+models/
+notebooks/yolov5
+notebooks/*.pt
+notebooks/deeplesion_yolo
