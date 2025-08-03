@@ -3,6 +3,7 @@ runs/
 data/deeplesion/
 .vscode
 models/
+notebooks/data
 notebooks/yolov5
 notebooks/*.pt
 notebooks/deeplesion_yolo
