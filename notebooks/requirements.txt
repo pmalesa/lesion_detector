@@ -1,0 +1,9 @@
+numpy==1.26.4
+matplotlib==3.9.3
+pandas==2.2.3
+jupyter==1.1.1
+PyYAML==6.0.2
+types-PyYAML==6.0.12
+opencv-python==4.12.0
+torch==2.7.1
+torchvision==0.22.1
