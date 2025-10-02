@@ -62,5 +62,8 @@ pre-commit install
 pre-commit run --all-files
 ```
 
+## Jupyter Notebook
+The *notebook* directory contains a Jupyter Notebook dedicated to training and evaluation of supervised learning algorithms on the task of lesion detection in CT images.
+
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
