@@ -6,3 +6,4 @@ PyYAML>=6,<7
 opencv-python>=4.10,<5
 torch>=2.7,<3
 torchvision>=0.22,<1
+torchmetrics>=1.3
