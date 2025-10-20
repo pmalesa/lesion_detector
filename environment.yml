@@ -23,10 +23,11 @@ dependencies:
   # - cudatoolkit=11.8.0
   # - cudnn=9.3.0.75
 
-  # PyTorch & Torchhvision
+  # PyTorch & Torchvision
   - pytorch=2.5.1
   - torchvision=0.20.1
   - torchmetrics=1.8.2
+  - pycocotools=2.0.10
 
   # Gymnasium & Tensorboard
   - gymnasium=1.0.0
