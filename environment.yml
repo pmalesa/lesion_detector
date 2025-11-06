@@ -33,6 +33,10 @@ dependencies:
   - gymnasium=1.0.0
   - tensorboard=2.19.0
 
+  # Transformers
+  - transformers=4.57.1
+  - timm=1.0.21
+
   # Include pip for pip-only packages 
   - pip
 
