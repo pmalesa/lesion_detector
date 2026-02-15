@@ -1,0 +1,10 @@
+numpy>=1.21,<2
+matplotlib>=3.5,<4
+pandas>=1.4,<3
+PyYAML>=6,<7
+opencv-python>=4.5,<5
+torch==1.12.1
+torchvision==0.13.1
+torchmetrics>=0.9,<1.0
+pycocotools>=2.0
+timm>=0.6,<1.0
