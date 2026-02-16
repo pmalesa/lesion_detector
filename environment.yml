@@ -10,6 +10,7 @@ dependencies:
   - numpy=1.26.4
   - matplotlib=3.9.3
   - pandas=2.2.3
+  - scipy=1.17.0
 
   # Jupyter Notebooks
   - jupyter=1.1.1
