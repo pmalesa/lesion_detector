@@ -269,7 +269,7 @@ plt.bar(
 )
 
 plt.title(
-    "Rozkład szerokości i wysokości ramek ograniczających",
+    "Rozkład szerokości i wysokości ramek ograniczających w zbiorze DeepLesion",
     fontsize=16,
     fontweight="bold",
 )
