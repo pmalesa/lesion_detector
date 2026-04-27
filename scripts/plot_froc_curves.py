@@ -69,7 +69,7 @@ def plot_froc_curves(froc_dir, title, output_path=None):
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
 
-    plt.xlim(0, 30)
+    plt.xlim(0, 15)
     plt.ylim(0, 1.0)
     plt.grid(True, linestyle="--", alpha=0.2)
     plt.legend()
